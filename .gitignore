@@ -42,4 +42,4 @@ Thumbs.db
 # Note: The 'bin/' directory contains heavy third-party executables 
 # (ffmpeg, pngquant, ghostscript, etc.). If you do not want to track 
 # these large binaries in your git repository, uncomment the line below:
-# bin/
+bin/
