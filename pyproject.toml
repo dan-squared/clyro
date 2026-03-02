@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clyro"
+version = "0.1.0"
+description = "Windows media optimization app migrated from Clop."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "PyQt6>=6.8",
+  "Pillow>=10.4",
+  "pypdf>=5.1",
+  "pillow-heif",
+  "pymupdf",
+  "pdf2docx",
+  "typer>=0.12",
+  "aiohttp>=3.9",
+]
+
+[project.scripts]
+clyro = "clyro.main:main"
+clyro-cli = "clyro.cli.commands:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

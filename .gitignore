@@ -1,0 +1,45 @@
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller / Build artifacts
+build/
+dist/
+*.spec
+*.manifest
+*.log
+*_log.txt
+build_log.txt
+rebuild_log.txt
+
+# Installer output (Inno Setup)
+Output/
+
+# Development / IDE
+.vscode/
+.idea/
+*.swp
+*.bak
+
+# Virtual Environments
+venv/
+env/
+.env
+
+# Application local data / caches
+.appdata/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Note: The 'bin/' directory contains heavy third-party executables 
+# (ffmpeg, pngquant, ghostscript, etc.). If you do not want to track 
+# these large binaries in your git repository, uncomment the line below:
+# bin/

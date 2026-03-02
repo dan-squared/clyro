@@ -1,0 +1,129 @@
+import sys
+import logging
+import logging.handlers
+import socket
+import http.client
+import json
+import time
+from pathlib import Path
+from PyQt6.QtWidgets import QApplication
+import multiprocessing
+
+from clyro.utils.paths import get_app_data_dir, resource_path
+from clyro.app import AppManager
+from PyQt6.QtGui import QIcon
+import ctypes
+import os
+
+def setup_logging():
+    log_dir = get_app_data_dir() / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[
+            logging.handlers.RotatingFileHandler(
+                log_dir / "clyro.log",
+                encoding="utf-8",
+                maxBytes=2_000_000,
+                backupCount=3,
+            ),
+            logging.StreamHandler(sys.stdout),
+        ],
+    )
+
+
+def _install_crash_handler():
+    """Ensure unhandled exceptions are written to the rotating log (invisible in .exe otherwise)."""
+    import traceback
+    _log = logging.getLogger("clyro.crash")
+
+    def _excepthook(exc_type, exc_value, exc_tb):
+        if issubclass(exc_type, (KeyboardInterrupt, SystemExit)):
+            sys.__excepthook__(exc_type, exc_value, exc_tb)
+            return
+        msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        _log.critical(f"Unhandled exception:\n{msg}")
+
+    sys.excepthook = _excepthook
+
+
+def cleanup_stale_temp():
+    """Remove partial/stale download files older than 24 hours."""
+    temp_dir = get_app_data_dir() / "downloads"
+    if not temp_dir.exists():
+        return
+    cutoff = time.time() - 86400  # 24 hours
+    removed = 0
+    for f in temp_dir.iterdir():
+        try:
+            if f.is_file() and f.stat().st_mtime < cutoff:
+                f.unlink(missing_ok=True)
+                removed += 1
+        except Exception:
+            pass
+    if removed:
+        logging.getLogger(__name__).info(f"Cleaned up {removed} stale temp file(s) from {temp_dir}")
+
+def check_single_instance():
+    """Returns True if another instance is already running."""
+    try:
+        # Try to connect to existing instance's IPC server
+        conn = http.client.HTTPConnection("localhost", 19847, timeout=1)
+        conn.request("POST", "/show")
+        resp = conn.getresponse()
+        if resp.status == 200:
+            return True
+        return False
+    except (OSError, ConnectionRefusedError, TimeoutError, http.client.HTTPException):
+        return False
+
+def main():
+    multiprocessing.freeze_support()
+    setup_logging()
+    _install_crash_handler()
+    cleanup_stale_temp()
+    
+    logger = logging.getLogger(__name__)
+    
+    if check_single_instance():
+        # Exit quietly if another instance handled the show request
+        sys.exit(0)
+        
+    logger.info("Starting Clyro...")
+
+    qt_app = QApplication(sys.argv)
+    qt_app.setApplicationName("Clyro")
+    
+    # Windows taskbar icon fix - call early
+    if sys.platform == "win32":
+        try:
+            myappid = u"dan.clyro.app.v1"
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        except Exception as e:
+            logger.warning(f"Failed to set AppUserModelID: {e}")
+            
+    # Set global window icon
+    # Load icon once — passed into AppManager to avoid reading the same file twice
+    icon_path = resource_path("clyro/assets/icons/app/256.ico")
+    app_icon = None
+    if icon_path.exists():
+        app_icon = QIcon(str(icon_path))
+    else:
+        png_path = resource_path("clyro/assets/icons/app/PNG Icon.png")
+        if png_path.exists():
+            app_icon = QIcon(str(png_path))
+
+    if app_icon:
+        qt_app.setWindowIcon(app_icon)
+    
+    # We want the app to stay alive even if the dropzone window is closed if tray is enabled
+    qt_app.setQuitOnLastWindowClosed(False)
+    
+    manager = AppManager(qt_app, app_icon)
+    
+    sys.exit(qt_app.exec())
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,3 @@
+[console_scripts]
+clyro = clyro.main:main
+clyro-cli = clyro.cli.commands:main

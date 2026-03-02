@@ -1,0 +1,8 @@
+PyQt6>=6.8
+Pillow>=10.4
+pypdf>=5.1
+pillow-heif
+pymupdf
+pdf2docx
+typer>=0.12
+aiohttp>=3.9

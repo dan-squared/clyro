@@ -1,0 +1,78 @@
+Metadata-Version: 2.4
+Name: clyro
+Version: 0.1.0
+Summary: Windows media optimization app migrated from Clop.
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: PyQt6>=6.8
+Requires-Dist: Pillow>=10.4
+Requires-Dist: pypdf>=5.1
+Requires-Dist: pillow-heif
+Requires-Dist: pymupdf
+Requires-Dist: pdf2docx
+Requires-Dist: typer>=0.12
+Requires-Dist: aiohttp>=3.9
+
+# Clyro
+
+PyQt6 Windows desktop media optimizer architecture scaffold.
+
+- Migration plan: `CLOP_WINDOWS_PYQT6_MIGRATION_PLAN.md`
+- Architecture blueprint: `CLOP_WINDOWS_PYQT6_ARCHITECTURE_BLUEPRINT.md`
+
+## Current slice status
+
+Implemented:
+
+1. End-to-end `optimise` CLI flow for image + video + PDF files with queue-backed execution.
+2. Layered flow: `presentation -> application -> domain -> infrastructure`.
+3. Image optimization backend:
+   - `pngquant` for PNG when available
+   - `jpegoptim` for JPEG when available
+   - Pillow fallback when binaries are unavailable
+4. Settings-driven image behavior:
+   - persisted JSON settings at `%APPDATA%\\Clyro\\settings.json`
+   - preferred output format (`keep/jpeg/webp/png`) with alpha fallback
+   - metadata preserve/strip policy
+   - GIF processing opt-in
+   - skip-if-larger control integrated via settings + command flags
+5. Output template + output path policy.
+6. Phosphor SVG icon registry wired to local asset folder (`src/clyro/assets/SVGs`).
+7. Process runner supports live stdout/stderr output callbacks.
+8. Process runner supports hard cancellation checks for long-running subprocesses.
+9. Local IPC server endpoints:
+   - `GET /health`
+   - `POST /optimise` (optional token via `X-Clyro-Token`, `?wait=0` async)
+   - `GET /jobs` and `GET /jobs/<job_id>`
+   - `POST /stop` (`{"job_id": "<id>"}` or `{"all": true}` / `?all=1`)
+10. Minimal PyQt floating results window:
+   - choose image files
+   - run optimisation via queue service
+   - show per-file progress bars for queued/running jobs
+   - cancel latest active job from UI
+11. Test coverage:
+    - unit tests for use case/queue/IPC/process runner/UI VM
+    - integration tests for settings-driven image format, metadata, and larger-output skip behavior
+    - integration tests for video metadata probing, FFmpeg filter command building, progress parsing, and cancellation
+    - integration tests for PDF validation, Ghostscript progress mapping, larger-output skip behavior, and cancellation
+12. PDF crop/uncrop operations:
+    - `crop-pdf` command (left/right/top/bottom margins in points)
+    - `uncrop-pdf` command (restore crop box to media box)
+    - requires `pypdf` for crop/uncrop support
+13. Orchestrator and in-memory state store:
+    - `OptimisationOrchestrator` wraps queue submission/list/get/wait/stop APIs
+    - `AppStateStore` tracks job lifecycle snapshots (progress/status/result summaries)
+    - richer batch summaries in CLI/IPC (bytes + media-type counts)
+
+CLI usage:
+
+```powershell
+$env:PYTHONPATH=\"src\"
+python -m clyro.presentation.cli.main optimise .\path\to\image.jpg
+python -m clyro.presentation.cli.main optimise .\path\to\image.jpg --json
+python -m clyro.presentation.cli.main optimise .\path\to\clip.mp4 --video-fps-cap 30 --video-max-width 1280 --video-force-aac
+python -m clyro.presentation.cli.main optimise .\path\to\clip.mp4 --video-remove-audio --video-playback-speed 1.25 --video-crop 1280:720:0:0
+python -m clyro.presentation.cli.main optimise .\path\to\doc.pdf --aggressive
+python -m clyro.presentation.cli.main crop-pdf .\path\to\doc.pdf --left 18 --right 18 --top 24 --bottom 24
+python -m clyro.presentation.cli.main uncrop-pdf .\path\to\doc.pdf --in-place
+```
