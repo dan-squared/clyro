@@ -43,7 +43,6 @@ INPUT_STYLE = """
     }
 """
 
-
 def _section(title: str) -> tuple[QFrame, QVBoxLayout]:
     frame = QFrame()
     frame.setObjectName("section")
@@ -60,7 +59,6 @@ def _section(title: str) -> tuple[QFrame, QVBoxLayout]:
     inner.setSpacing(8)
     outer.addLayout(inner)
     return frame, inner
-
 
 class DropzoneShortcutsPage(QWidget):
     def __init__(self, settings):

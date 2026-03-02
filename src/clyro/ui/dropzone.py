@@ -27,7 +27,6 @@ CARD_ITEM_H = 80   # each BatchItem height (pill 30 + card 48 + gap 2)
 CARD_GAP   = 6
 MAX_SHOW   = 5
 
-
 def _icon(name: str) -> QIcon:
     from clyro.utils.paths import resource_path
     return QIcon(str(resource_path(f"clyro/assets/icons/phosphor/{name}")))
@@ -36,7 +35,6 @@ def _fmt(b: int) -> str:
     if b < 1024:        return f"{b} B"
     if b < 1024 ** 2:   return f"{b/1024:.0f} KB"
     return f"{b/(1024**2):.1f} MB"
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 class DropzoneWindow(QWidget):
@@ -495,7 +493,7 @@ class DropzoneWindow(QWidget):
 
         if not event.mimeData().hasUrls(): return
 
-        # Drop validation: reject unsupported-only drops (Clop validateDrop pattern)
+        # Drop validation: reject unsupported-only drops
         urls = event.mimeData().urls()
         has_supported = any(
             u.scheme() in ('http', 'https')
@@ -524,7 +522,7 @@ class DropzoneWindow(QWidget):
         event.acceptProposedAction()
 
     def dragMoveEvent(self, event: QDragMoveEvent):
-        """Live modifier key feedback — updates hint in real-time (Clop DragManager pattern)."""
+        """Live modifier key feedback — updates hint in real-time."""
         self._update_drag_hints(event.modifiers())
         event.acceptProposedAction()
 
@@ -552,7 +550,7 @@ class DropzoneWindow(QWidget):
         for u in event.mimeData().urls():
             if u.isLocalFile():
                 p = Path(u.toLocalFile())
-                # Recursive directory drop (Clop optimiseDir pattern)
+                # Recursive directory drop
                 if p.is_dir():
                     for child in p.rglob('*'):
                         if child.is_file() and child.suffix.lower() in _ALL_SUPPORTED:
@@ -835,8 +833,7 @@ class DropzoneWindow(QWidget):
             if intent.mode == "aggressive":
                 cmd = OptimiseCommand(path, aggressive=True, output_mode=self.settings.output_mode)
             elif intent.mode == "convert":
-                # Special handler for web downloads passing through convert flow:
-                # We need to respect "keep originals" since they are in the target destination already.
+                # Web Download Conversion: Respect "keep originals" if the file is already in the download destination
                 if str(path.parent) == self.settings.web_download_folder:
                     cmd_mode = "specific_folder" if self.settings.keep_web_originals else "in_place"
                     cmd_dir  = Path(self.settings.web_download_folder) if self.settings.keep_web_originals else None
@@ -880,7 +877,7 @@ class DropzoneWindow(QWidget):
                 self._s_actions.hide()
                 already_has_single = False
 
-        # ── Batch resume: auto-clear stale completed items (Clop pattern) ─
+        # ── Batch resume: auto-clear stale completed items ─
         if already_has_batch and all(
             (bi.card._bar.isHidden() if hasattr(bi.card, '_bar') else True)
             for bi in self._batch_items.values()
@@ -995,7 +992,7 @@ class DropzoneWindow(QWidget):
             else:
                 self._btn_zap.show()
 
-            # Auto-dismiss completed single result after 30s (Clop remove(after:) pattern)
+            # Auto-dismiss completed single result after 30s
             self._start_auto_dismiss()
             
             if getattr(self.settings, 'auto_copy_to_clipboard', False):
@@ -1009,7 +1006,7 @@ class DropzoneWindow(QWidget):
             )
             self._btn_undo.show()
         elif job.status == "cached":
-            # Show "Already optimized" message briefly, play button to skip, then auto-dismiss
+            # Render "Already optimized" cache hit state with force-reoptimize option and auto-dismissal
             self._s_close.setIcon(_icon("x-bold.svg"))
             self._s_center.setCurrentIndex(1)
             self._s_diff.setText(
@@ -1051,14 +1048,14 @@ class DropzoneWindow(QWidget):
     # ─── Side button actions ──────────────────────────────────────────────────
 
     def _downscale_single(self):
-        """Downscale the current file (Clop - button pattern)."""
+        """Downscale the current file."""
         if not self._single_job_id:
             return
         job = self.queue.jobs.get(self._single_job_id)
         if not job or not job.result:
             return
-        # Re-optimize with a downscale by submitting a new video/image resize command
-        # For now, we re-submit the file with aggressive=True for max compression
+        # Re-optimize dynamically based on media thresholds. 
+        # (Currently implemented as a fallback to aggressive mode; actual downscaling pending).
         src = job.result.output_path or job.command.path
         if not src.exists():
             return
@@ -1100,7 +1097,7 @@ class DropzoneWindow(QWidget):
         self.queue.submit(cmd)
 
     def _aggressive_single(self):
-        """Re-optimize the current file with aggressive settings (Clop ⚡ pattern)."""
+        """Re-optimize the current file with aggressive settings."""
         if not self._single_job_id:
             return
         job = self.queue.jobs.get(self._single_job_id)
@@ -1125,7 +1122,7 @@ class DropzoneWindow(QWidget):
         self.queue.submit(cmd)
 
     def _undo_single(self):
-        """Restore the original file from backup (Clop undo pattern)."""
+        """Restore the original file from backup."""
         if not self._single_job_id:
             return
         job = self.queue.jobs.get(self._single_job_id)
@@ -1159,7 +1156,7 @@ class DropzoneWindow(QWidget):
                 subprocess.call(["explorer", "/select,", str(self._single_result)])
 
     def _start_auto_dismiss(self):
-        """Auto-dismiss completed single result after 30s (Clop remove(after:) pattern)."""
+        """Auto-dismiss completed single result after 30s."""
         if self._auto_dismiss_timer:
             self._auto_dismiss_timer.stop()
         self._auto_dismiss_timer = QTimer()
@@ -1309,7 +1306,7 @@ class DropzoneWindow(QWidget):
     # ─── Window drag & double click ───────────────────────────────────────────
 
     def mouseDoubleClickEvent(self, e):
-        """Double-click to open result (Clop TapGesture(count: 2) pattern)."""
+        """Double-click to open result."""
         if e.button() == Qt.MouseButton.LeftButton:
             if self._shell_stack.currentIndex() == 1 and self._s_center.currentIndex() == 1:
                 if self._single_result and self._single_result.exists():
@@ -1391,7 +1388,6 @@ class DropzoneWindow(QWidget):
                         self._s_res_lbl.setStyleSheet("font-family: 'Space Mono', Consolas, monospace; font-size:12px;font-weight:600;color:rgba(255,255,255,0.85);")
                     ])
         super().contextMenuEvent(event)
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # BatchItem — a pill + card body pair for each file in batch mode
@@ -1542,7 +1538,7 @@ class BatchItem(QWidget):
     # ─── Mouse Interaction (Drag Out, Copy, Double Click) ──────────────────────
     
     def mouseDoubleClickEvent(self, event):
-        """Double-click to open result (Clop TapGesture(count: 2) pattern)."""
+        """Double-click to open result."""
         if event.button() == Qt.MouseButton.LeftButton and self.output_path and self.output_path.exists():
             import os, sys, subprocess
             if sys.platform == "win32":

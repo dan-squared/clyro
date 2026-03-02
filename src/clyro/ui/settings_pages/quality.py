@@ -59,7 +59,6 @@ SLIDER_STYLE = """
     }
 """
 
-
 def _section(title: str) -> tuple[QFrame, QVBoxLayout]:
     frame = QFrame()
     frame.setObjectName("section")
@@ -76,7 +75,6 @@ def _section(title: str) -> tuple[QFrame, QVBoxLayout]:
     inner.setSpacing(8)
     outer.addLayout(inner)
     return frame, inner
-
 
 def _spinbox_row(label: str, min_val: int, max_val: int, suffix: str = "") -> tuple[QHBoxLayout, QSpinBox]:
     row = QHBoxLayout()
@@ -130,7 +128,6 @@ def _spinbox_row(label: str, min_val: int, max_val: int, suffix: str = "") -> tu
     row.addStretch()
     return row, sb
 
-
 def _slider_row(label: str, lo: int, hi: int) -> tuple[QHBoxLayout, QSlider, QLabel]:
     row = QHBoxLayout()
     lbl = QLabel(label)
@@ -147,7 +144,6 @@ def _slider_row(label: str, lo: int, hi: int) -> tuple[QHBoxLayout, QSlider, QLa
     row.addWidget(sl, 1)
     row.addWidget(val_lbl)
     return row, sl, val_lbl
-
 
 class QualityPage(QWidget):
     def __init__(self, settings):

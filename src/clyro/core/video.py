@@ -15,11 +15,10 @@ logger = logging.getLogger(__name__)
 _CPU_COUNT = os.cpu_count() or 2
 
 # ---------------------------------------------------------------------------
-# Hardware encoder detection (Clop's adaptive encoder pattern)
+# Hardware encoder detection
 # ---------------------------------------------------------------------------
 
 _HW_ENCODER_CACHE: dict[str, str | None] = {}
-
 
 def _detect_hw_encoder(ffmpeg_path) -> str | None:
     """Auto-detect the best available H.264 hardware encoder.
@@ -61,7 +60,6 @@ def _detect_hw_encoder(ffmpeg_path) -> str | None:
     logger.info("No hardware encoder available — using software libx264")
     _HW_ENCODER_CACHE[key] = None
     return None
-
 
 # ---------------------------------------------------------------------------
 # Video metadata
@@ -125,7 +123,6 @@ def _get_video_info(ffprobe_path, source: Path) -> dict:
         logger.debug(f"ffprobe failed for {source}: {e}")
 
     return info
-
 
 # ---------------------------------------------------------------------------
 # FFmpeg subprocess helper with retry
@@ -209,7 +206,6 @@ def _run_ffmpeg(
 
     return None
 
-
 def _fmt_time(seconds: float) -> str:
     """Format seconds into MM:SS or HH:MM:SS."""
     s = int(seconds)
@@ -218,7 +214,6 @@ def _fmt_time(seconds: float) -> str:
     if h > 0:
         return f"{h}:{m:02d}:{s:02d}"
     return f"{m:02d}:{s:02d}"
-
 
 # =========================================================================
 # VideoHandler — main optimization engine
@@ -253,17 +248,17 @@ class VideoHandler:
         if job.is_cancelled:
             return Result(source, source, orig_size, orig_size, resolution=resolution)
 
-        # ---- Build encoder args (Clop adaptive encoder pattern) ----
+        # ---- Build encoder args ----
         encoder_args = self._build_encoder_args(aggressive, out_path)
         encoder_args_sw = self._build_encoder_args(aggressive, out_path, force_software=True)
 
-        # ---- Audio args (Clop audio mapping pattern) ----
+        # ---- Audio args ----
         audio_args = self._build_audio_args(meta["has_audio"])
 
         # ---- Build full command variants (with fallbacks) ----
         base_args = [str(self.tools.ffmpeg), "-y", "-i", str(source)]
 
-        # Strip metadata if configured (Clop stripMetadata pattern)
+        # Strip metadata if configured
         strip = getattr(self.settings, 'strip_metadata', False) if self.settings else False
         if strip:
             base_args += ["-map_metadata", "-1"]
@@ -314,7 +309,7 @@ class VideoHandler:
             out_path.unlink(missing_ok=True)
             return Result(source, source, orig_size, orig_size, resolution=resolution)
 
-        # Copystat to preserve timestamps (Clop copyCreationModificationDates pattern)
+        # Copystat to preserve timestamps
         if out_path.exists():
             try:
                 shutil.copystat(source, out_path)
@@ -334,7 +329,7 @@ class VideoHandler:
         is_mp4_like = ext in (".mp4", ".mov", ".m4v")
 
         if aggressive:
-            # Always software for aggressive — mirrors Clop's slower/CRF 26
+            # Always software for aggressive — mirrors The slower/CRF 26
             return ["-c:v", "libx264", "-crf", "26", "-preset", "slower"]
 
         if not force_software and self.hw_encoder and is_mp4_like:
@@ -354,7 +349,7 @@ class VideoHandler:
         return args
 
     def _build_audio_args(self, has_audio: bool) -> list[str]:
-        """Build audio arguments (Clop's audioArgs pattern)."""
+        """Build audio arguments."""
         remove_audio = self.settings.video_remove_audio if self.settings else False
         convert_to_aac = getattr(self.settings, "video_convert_audio_to_aac", False) if self.settings else False
 
@@ -365,7 +360,6 @@ class VideoHandler:
         if convert_to_aac:
             return ["-c:a", "aac", "-b:a", "192k", "-map", "0:v", "-map", "0:a?"]
         return ["-c:a", "copy", "-map", "0:v", "-map", "0:a?"]
-
 
 # =========================================================================
 # VideoToVideoHandler — format conversion with progress
@@ -447,7 +441,6 @@ class VideoToVideoHandler:
         signals.progress.emit(job.id, (100, "Done"))
         return Result(source, out_path, orig_size, out_path.stat().st_size, resolution=resolution)
 
-
 # =========================================================================
 # VideoToImageHandler — video → GIF with palette generation
 # =========================================================================
@@ -474,7 +467,7 @@ class VideoToImageHandler:
             out_path.unlink(missing_ok=True)
             return None
 
-        # Two-pass palette-based GIF for higher quality (Clop uses gifski;
+        # Two-pass palette-based GIF for higher quality (The app uses gifski;
         # we use ffmpeg's palettegen/paletteuse which is cross-platform)
         palette_path = out_path.with_name(f"_palette_{out_path.stem}.png")
 

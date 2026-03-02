@@ -10,9 +10,8 @@ from clyro.errors import FileNotSupportedError, ClyroError
 
 logger = logging.getLogger(__name__)
 
-
 def _wait_for_stable(path: Path, timeout: float = 10.0, interval: float = 0.3) -> None:
-    """Wait until file's mtime stops changing (Clop's waitForModificationDateToSettle).
+    """Wait until file's mtime stops changing (The waitForModificationDateToSettle).
 
     Prevents processing files that are still being written (e.g. browser downloads).
     """
@@ -40,7 +39,6 @@ def _wait_for_stable(path: Path, timeout: float = 10.0, interval: float = 0.3) -
 
     logger.debug(f"File settling timeout for {path.name} — proceeding anyway")
 
-
 class CommandDispatcher:
     """Routes Job commands to explicit engine routines."""
     def __init__(self, settings, tools, optimize_dispatcher, convert_dispatcher):
@@ -67,7 +65,7 @@ class CommandDispatcher:
         if media_type == MediaType.UNSUPPORTED:
             raise FileNotSupportedError(f"Unsupported file type: {cmd.path.suffix}")
 
-        # Wait for file to finish being written (Clop settling pattern)
+        # Wait for file to finish being written
         _wait_for_stable(cmd.path)
 
         # Pre-flight: ensure at least 2× source size of free disk space on the output drive
@@ -104,7 +102,7 @@ class CommandDispatcher:
             if err:
                 raise ClyroError(err)
 
-            # Backup original before in-place optimization (Clop backup pattern)
+            # Backup original before in-place optimization
             if self.settings and getattr(self.settings, 'backup_originals', True):
                 if getattr(self.settings, 'output_mode', '') == 'in_place':
                     backup_path = backup_file(cmd.path)

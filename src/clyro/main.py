@@ -33,7 +33,6 @@ def setup_logging():
         ],
     )
 
-
 def _install_crash_handler():
     """Ensure unhandled exceptions are written to the rotating log (invisible in .exe otherwise)."""
     import traceback
@@ -47,7 +46,6 @@ def _install_crash_handler():
         _log.critical(f"Unhandled exception:\n{msg}")
 
     sys.excepthook = _excepthook
-
 
 def cleanup_stale_temp():
     """Remove partial/stale download files older than 24 hours."""
@@ -96,7 +94,7 @@ def main():
     qt_app = QApplication(sys.argv)
     qt_app.setApplicationName("Clyro")
     
-    # Windows taskbar icon fix - call early
+    # Ensure Windows Taskbar uses our custom AppUserModelID icon
     if sys.platform == "win32":
         try:
             myappid = u"dan.clyro.app.v1"
@@ -104,8 +102,7 @@ def main():
         except Exception as e:
             logger.warning(f"Failed to set AppUserModelID: {e}")
             
-    # Set global window icon
-    # Load icon once — passed into AppManager to avoid reading the same file twice
+    # Load the global application icon once to be passed into the AppManager
     icon_path = resource_path("clyro/assets/icons/app/256.ico")
     app_icon = None
     if icon_path.exists():
@@ -118,7 +115,7 @@ def main():
     if app_icon:
         qt_app.setWindowIcon(app_icon)
     
-    # We want the app to stay alive even if the dropzone window is closed if tray is enabled
+    # Keep the application running in the background (for system tray support)
     qt_app.setQuitOnLastWindowClosed(False)
     
     manager = AppManager(qt_app, app_icon)

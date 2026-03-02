@@ -1,7 +1,6 @@
 import math
 from PIL import Image
 
-
 def calculate_shannon_entropy(img: Image.Image) -> float:
     """
     Calculate the Shannon entropy of an image using all RGB channels.
@@ -33,12 +32,11 @@ def calculate_shannon_entropy(img: Image.Image) -> float:
 
     return entropy
 
-
 def large_area_entropy(img: Image.Image, threshold: int = 1_000_000) -> float | None:
     """Return entropy only if the image area exceeds *threshold* pixels.
 
     Small images produce unreliable entropy values, so this helper mirrors
-    Clop's ``largeAreaEntropy`` property.
+    The ``largeAreaEntropy`` property.
     """
     w, h = img.size
     if w * h > threshold:

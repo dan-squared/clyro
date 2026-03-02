@@ -19,7 +19,7 @@ class QueueService(QObject):
         super().__init__()
         self.dispatcher = dispatcher
         self.thread_pool = QThreadPool.globalInstance()
-        # Increased to allow parallel processing of batch items
+        # Allow up to 4 concurrent optimization workers to process batch drops faster
         self.thread_pool.setMaxThreadCount(4) 
         
         self.jobs: dict[str, Job] = {}
@@ -28,7 +28,7 @@ class QueueService(QObject):
         self._optimised_cache: dict[str, Result] = {}  # file_hash → Result
 
     def submit(self, command: Command) -> str:
-        # ---- Duplicate optimization guard (Clop hash cache pattern) ----
+        # Fast path: If file hash matches a recently completed job, return cached result immediately
         if isinstance(command, OptimiseCommand) and command.path.exists():
             try:
                 fhash = file_hash(command.path)
@@ -98,7 +98,7 @@ class QueueService(QObject):
             logger.info(f"Job completed: {job_id}")
             self.job_updated.emit(job)
 
-            # Cache the result by file hash for duplicate guard
+            # Store success results by file hash to prevent redundant re-optimizations on identical files
             if isinstance(job.command, OptimiseCommand) and job.command.path.exists():
                 try:
                     fhash = file_hash(job.command.path)
@@ -112,7 +112,6 @@ class QueueService(QObject):
 
         # Defer gc to avoid stalling the main thread mid-signal-callback
         QTimer.singleShot(500, lambda: gc.collect(0))
-
 
     def _on_job_failed(self, job_id: str, message: str, detail: str):
         if job := self.jobs.get(job_id):

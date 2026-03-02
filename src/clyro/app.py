@@ -55,7 +55,7 @@ class AppManager:
         if self.settings.show_tray:
             self.tray.show()
             
-        # UI floating background state - Dropzone hidden by default unless requested from tray
+        # Start hidden by default; user summons it via tray or global shortcut
         self.dropzone.show()
         
         # IPC
@@ -72,7 +72,7 @@ class AppManager:
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(2000, self._warn_missing_tools)
 
-        # Temp file cleanup timer (Clop createFileCleaner pattern)
+        # Temp file cleanup timer
         self._cleanup_timer = QTimer()
         self._cleanup_timer.timeout.connect(self._cleanup_temp_files)
         self._cleanup_timer.start(600_000)  # every 10 minutes
@@ -116,7 +116,7 @@ class AppManager:
         opt_dispatch = OptimizeDispatcher(ih, vh, ph)
         conv_dispatch = ConvertDispatcher(i_i, i_p, v_v, v_i, p_i, p_d)
         
-        # Re-inject the new dispatchers and settings into the core router
+        # Update command router with newly instantiated handlers based on new settings
         self.cmd_dispatch.settings = self.settings
         self.cmd_dispatch.opt_dispatch = opt_dispatch
         self.cmd_dispatch.conv_dispatch = conv_dispatch
@@ -164,7 +164,7 @@ class AppManager:
             self.tray.showMessage("Clyro — Tools Missing", msg, msecs=6000)
             
     def _cleanup_temp_files(self):
-        """Delete stale Clyro temp files older than 1 hour (Clop fileCleaner pattern)."""
+        """Delete stale Clyro temp files older than 1 hour."""
         max_age = 3600  # 1 hour in seconds
         now = time.time()
         patterns = ["_clyro_tmp_*", "_palette_*", "*.tmp.jpg", "*.tmp.png"]

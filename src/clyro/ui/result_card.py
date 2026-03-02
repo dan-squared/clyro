@@ -18,14 +18,12 @@ def _icon(name: str) -> QIcon:
     from clyro.utils.paths import resource_path
     return QIcon(str(resource_path(f"clyro/assets/icons/phosphor/{name}")))
 
-
 def _fmt(bytes_: int) -> str:
     if bytes_ < 1024:
         return f"{bytes_} B"
     if bytes_ < 1024 ** 2:
         return f"{bytes_ / 1024:.0f} KB"
     return f"{bytes_ / (1024 ** 2):.1f} MB"
-
 
 # ─── Compact Card ────────────────────────────────────────────────────────────
 
@@ -199,7 +197,6 @@ class ResultCard(QWidget):
                 border-radius: 12px;
             }
         """)
-
 
     def set_failed(self, msg: str):
         self._bar.hide()

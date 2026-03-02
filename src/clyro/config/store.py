@@ -8,7 +8,6 @@ from clyro.utils.paths import get_app_data_dir
 
 logger = logging.getLogger(__name__)
 
-
 def _coerce_settings(s: Settings) -> Settings:
     """Clamp and type-coerce settings to guard against hand-edited config.json."""
     s.image_jpeg_quality   = max(1,  min(100, int(s.image_jpeg_quality)))

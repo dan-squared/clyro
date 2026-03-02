@@ -97,7 +97,6 @@ GS_COMMON_ARGS = [
     "-dUCRandBGInfo=/Remove",
 ]
 
-
 def _gs_pre_args(qfactor: float) -> list[str]:
     """Build GS pre-args with dynamic QFactor for image quality control."""
     q = f"{qfactor:.2f}"
@@ -119,7 +118,6 @@ GS_POST_ARGS = [
     "-c", "/pdfmark { originalpdfmark } bind def", "-f",
     "-c", "[ /Producer () /ModDate () /CreationDate () /DOCINFO pdfmark", "-f",
 ]
-
 
 class PdfHandler:
     def __init__(self, settings, tools):
@@ -217,7 +215,6 @@ class PdfHandler:
         except Exception:
             return 0
 
-
 class PdfToImageHandler:
     def __init__(self, tools):
         self.tools = tools
@@ -238,8 +235,7 @@ class PdfToImageHandler:
                     return None
                 pix = page.get_pixmap(dpi=150)
                 pix.save(str(out_path))
-                # For a full document we might want to iterate pages and save as a zip,
-                # but for simplicity we take the first page as preview or if 1 page.
+                # Render the first page as a preview. (Complex multi-page extraction to ZIP is omitted for simplicity)
             doc.close()
         except Exception as e:
             raise ToolExecutionError(f"PyMuPDF failed to convert PDF to image: {e}")
@@ -263,7 +259,7 @@ class PdfToWordHandler:
         if not Converter:
             raise ToolExecutionError("pdf2docx library not available.")
             
-        # Create a custom Converter subclass locally to intercept progress
+        # Subclass pdf2docx.Converter to intercept and emit progress to the UI
         class ProgressConverter(Converter):
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)

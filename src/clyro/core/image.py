@@ -21,14 +21,12 @@ logger = logging.getLogger(__name__)
 _heif_registered = False
 _CPU_COUNT = os.cpu_count() or 2
 
-
 def _ensure_heif():
     global _heif_registered
     if not _heif_registered:
         import pillow_heif
         pillow_heif.register_heif_opener()
         _heif_registered = True
-
 
 def _mozjpeg_pass(path: Path) -> None:
     """Run a lossless mozjpeg re-compression pass on an existing JPEG on disk."""
@@ -44,9 +42,8 @@ def _mozjpeg_pass(path: Path) -> None:
     except Exception as e:
         logger.warning(f"mozjpeg pass failed (non-fatal): {e}")
 
-
 # ---------------------------------------------------------------------------
-# Header-based type detection (ported from Clop)
+# File identification via magic bytes
 # ---------------------------------------------------------------------------
 
 _PNG_HEADER  = b"\x89PNG\r\n\x1a\n"
@@ -58,7 +55,6 @@ _WEBP_MARKER = b"WEBP"
 _BMP_HEADER  = b"BM"
 _TIFF_LE     = b"II\x2a\x00"
 _TIFF_BE     = b"MM\x00\x2a"
-
 
 def _get_real_type(path: Path) -> str:
     """Identify image type by header bytes, falling back to extension."""
@@ -84,7 +80,6 @@ def _get_real_type(path: Path) -> str:
         return "jpeg"
     return ext
 
-
 # ---------------------------------------------------------------------------
 # Subprocess helper
 # ---------------------------------------------------------------------------
@@ -109,7 +104,6 @@ def _run_tool(cmd: list[str], *, check: bool = True, tries: int = 1) -> subproce
     if check and last_err:
         raise last_err
     return None
-
 
 # =========================================================================
 # ImageHandler — main optimisation engine
@@ -139,7 +133,7 @@ class ImageHandler:
                 has_alpha = img.mode in ('RGBA', 'P', 'LA')
                 entropy = calculate_shannon_entropy(img)
 
-                # ---- Handle TIFF / BMP by converting to a native format first ----
+                # ---- Convert unoptimized formats (TIFF/BMP) to standard workflow formats ----
                 if real_type in ("tiff", "bmp"):
                     signals.progress.emit(job.id, (10, f"Converting {real_type.upper()} to optimizable format…"))
                     real_type, source = self._convert_foreign(img, source, real_type, has_alpha)
@@ -147,7 +141,7 @@ class ImageHandler:
                 if job.is_cancelled:
                     return Result(source, source, orig_size, orig_size, resolution=resolution)
 
-                # ---- Decide target type & whether to run a parallel trial ----
+                # ---- Format Evaluation: Determine if a secondary format should be trialed in parallel ----
                 adaptive = getattr(self.settings, "image_adaptive_format", True) if self.settings else True
                 target_type = real_type
                 run_trial = False  # should we also trial an alternate format?
@@ -185,7 +179,7 @@ class ImageHandler:
                     img.close()
                     img = Image.open(work_file)
 
-                # ---- Run primary optimisation (+ optional parallel trial) ----
+                # ---- Execute the optimization pipeline (optionally spawning a parallel format trial) ----
                 if run_trial:
                     actual_out_path = self._parallel_trial(
                         img, work_file, actual_out_path, real_type, aggressive, signals, job,
@@ -217,8 +211,7 @@ class ImageHandler:
             actual_out_path.unlink(missing_ok=True)
             return Result(source, source, orig_size, orig_size, resolution=resolution)
 
-
-        # Copystat to preserve timestamps (Clop copyCreationModificationDates pattern)
+        # Copystat to preserve timestamps
         if actual_out_path.exists():
             try:
                 shutil.copystat(source, actual_out_path)
@@ -229,7 +222,7 @@ class ImageHandler:
         return Result(source, actual_out_path, orig_size, opt_size, resolution=resolution)
 
     # ------------------------------------------------------------------
-    # Parallel dual-format trial (Clop tryProcs pattern)
+    # Parallel dual-format trial
     # ------------------------------------------------------------------
 
     def _parallel_trial(
@@ -289,11 +282,11 @@ class ImageHandler:
         p_out = fut_primary.result() if not fut_primary.exception() else None
         a_out = fut_alt.result() if not fut_alt.exception() else None
 
-        # Pick the smaller output
+        # Adaptive Result Selection: Return the smallest output file
         if p_out and a_out:
             p_size = p_out.stat().st_size
             a_size = a_out.stat().st_size
-            # Clop uses a 100KB threshold before switching format
+            # Format switching threshold: require at least 100KB of savings to justify changing the underlying file extension
             if p_size - a_size > 100_000:
                 logger.info(f"Adaptive: {alt_type} wins ({a_size:,} vs {p_size:,} bytes)")
                 p_out.unlink(missing_ok=True)
@@ -459,13 +452,13 @@ class ImageHandler:
         return True
 
     # ------------------------------------------------------------------
-    # TIFF / BMP conversion (Clop optimiseTIFF pattern)
+    # TIFF / BMP conversion
     # ------------------------------------------------------------------
 
     def _convert_foreign(
         self, img: Image.Image, source: Path, real_type: str, has_alpha: bool,
     ) -> tuple[str, Path]:
-        """Convert TIFF/BMP to PNG or JPEG before optimizing (Clop pattern)."""
+        """Convert TIFF/BMP to PNG or JPEG before optimizing."""
 
         # If the image file secretly contains PNG/JPEG data, detect by re-reading header
         try:
@@ -500,7 +493,7 @@ class ImageHandler:
     # ------------------------------------------------------------------
 
     def _pillow_fallback(self, img: Image.Image, out_path: Path, target_type: str, aggressive: bool):
-        """Last-resort: save with Pillow's built-in optimiser."""
+        """Fallback to Pillow's native optimization if external C-binaries fail or are absent."""
         quality = 75 if aggressive else (self.settings.image_jpeg_quality if self.settings else 80)
         exif = img.info.get("exif")
         kwargs = {"exif": exif} if exif else {}
@@ -516,7 +509,7 @@ class ImageHandler:
 
     @staticmethod
     def _strip_metadata(path: Path):
-        """Remove EXIF/GPS metadata from an image (Clop stripMetadata pattern)."""
+        """Strip non-essential EXIF/GPS metadata to save bytes before optimization."""
         try:
             with Image.open(path) as img:
                 data = list(img.getdata())
@@ -552,7 +545,6 @@ class ImageHandler:
                 candidate = _handle_collision(candidate)
             return candidate
         return out_path
-
 
 # =========================================================================
 # ImageToImageHandler — format conversion
@@ -611,7 +603,7 @@ class ImageToImageHandler:
             logger.error(f"Image conversion failed: {e}")
             raise
 
-        # Copystat to preserve timestamps (Clop copyCreationModificationDates pattern)
+        # Copystat to preserve timestamps
         if out_path.exists():
             try:
                 shutil.copystat(source, out_path)
@@ -620,7 +612,6 @@ class ImageToImageHandler:
 
         signals.progress.emit(job.id, (100, "Done"))
         return Result(source, out_path, orig_size, out_path.stat().st_size, resolution=res)
-
 
 # =========================================================================
 # ImageToPdfHandler — image → PDF conversion & merging

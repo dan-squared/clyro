@@ -18,7 +18,6 @@ TEXT_PRIMARY = "rgba(255,255,255,0.85)"
 TEXT_MUTED   = "rgba(255,255,255,0.35)"
 ACCENT       = "rgba(255,255,255,0.75)"
 
-
 class _NavItem(QPushButton):
     def __init__(self, label: str, index: int):
         super().__init__(label)
@@ -45,7 +44,6 @@ class _NavItem(QPushButton):
                 color: rgba(255,255,255,0.6);
             }}
         """)
-
 
 class SettingsWindow(QDialog):
     settings_saved = pyqtSignal()

@@ -1,4 +1,4 @@
-"""Backup & restore system for original files (Clop pattern).
+"""Backup & restore system for original files.
 
 Before in-place optimization, the original is copied to
 %APPDATA%/Clyro/backups/<hash_prefix>_<filename>.  Restore copies it back.
@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 _BACKUP_DIR: Path | None = None
 
-
 def _get_backup_dir() -> Path:
     global _BACKUP_DIR
     if _BACKUP_DIR is None:
@@ -22,7 +21,6 @@ def _get_backup_dir() -> Path:
         _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     return _BACKUP_DIR
 
-
 def _short_hash(path: Path) -> str:
     """First 8 hex chars of SHA-256 of the file content."""
     h = hashlib.sha256()
@@ -30,7 +28,6 @@ def _short_hash(path: Path) -> str:
         for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()[:8]
-
 
 def backup_file(source: Path) -> Path | None:
     """Copy *source* into the backup directory.  Returns the backup path."""
@@ -45,7 +42,6 @@ def backup_file(source: Path) -> Path | None:
         logger.warning(f"Backup failed for {source}: {e}")
         return None
 
-
 def restore_file(backup_path: Path, original_path: Path) -> bool:
     """Restore a previously backed-up file to its original location."""
     try:
@@ -58,7 +54,6 @@ def restore_file(backup_path: Path, original_path: Path) -> bool:
     except Exception as e:
         logger.warning(f"Restore failed: {e}")
         return False
-
 
 def file_hash(path: Path) -> str:
     """Fast partial hash for dedup cache: first 64KB + last 64KB + file size.

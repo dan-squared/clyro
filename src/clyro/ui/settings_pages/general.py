@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
-
 LABEL_STYLE = "font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.45); letter-spacing: 0.8px;"
 SECTION_STYLE = """
     QFrame#section {
@@ -75,7 +74,6 @@ BTN_STYLE = """
     }
 """
 
-
 def _section(title: str) -> tuple[QFrame, QVBoxLayout]:
     """Returns a styled section card and its inner layout."""
     frame = QFrame()
@@ -95,7 +93,6 @@ def _section(title: str) -> tuple[QFrame, QVBoxLayout]:
     inner.setSpacing(8)
     outer.addLayout(inner)
     return frame, inner
-
 
 class GeneralPage(QWidget):
     def __init__(self, settings):
