@@ -1,4 +1,29 @@
 import sys
+import os
+
+def _check_vcruntime():
+    """Check for VC++ runtime before anything else — PyQt6 needs it."""
+    try:
+        from PyQt6.QtWidgets import QApplication  # noqa: F401
+    except ImportError as e:
+        err = str(e).lower()
+        if "dll" in err or "vcruntime" in err or "msvcp" in err or "not found" in err:
+            # Show native Windows error — no PyQt6 available to show a dialog
+            import ctypes
+            msg = (
+                "Clyro requires the Microsoft Visual C++ Redistributable to run.\n\n"
+                "It appears to be missing on this system.\n\n"
+                "Please download and install it from:\n"
+                "https://aka.ms/vs/17/release/vc_redist.x64.exe\n\n"
+                "After installing, restart Clyro."
+            )
+            ctypes.windll.user32.MessageBoxW(0, msg, "Clyro — Missing Dependency", 0x10)
+            sys.exit(1)
+        raise  # Re-raise if it's a different import error
+
+if sys.platform == "win32":
+    _check_vcruntime()
+
 import logging
 import logging.handlers
 import socket
@@ -13,7 +38,6 @@ from clyro.utils.paths import get_app_data_dir, resource_path
 from clyro.app import AppManager
 from PyQt6.QtGui import QIcon
 import ctypes
-import os
 
 def setup_logging():
     log_dir = get_app_data_dir() / "logs"

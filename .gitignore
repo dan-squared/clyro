@@ -43,3 +43,4 @@ Thumbs.db
 # (ffmpeg, pngquant, ghostscript, etc.). If you do not want to track 
 # these large binaries in your git repository, uncomment the line below:
 bin/
+tmp_downloads/
