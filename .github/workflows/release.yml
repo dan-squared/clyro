@@ -35,8 +35,7 @@ jobs:
         
     - name: Build Executable via PyInstaller
       run: |
-        python build_release.py 
-      # Assuming build_release.py creates /dist/Clyro/Clyro.exe
+        python build_release.py --skip-inno
         
     - name: Compile Inno Setup Installer
       uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
