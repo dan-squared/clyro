@@ -1,0 +1,52 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller pytest pytest-qt
+        pip install -r requirements.txt
+        pip install -e .
+        
+    - name: Copy target binaries (if any stored remotely)
+      run: |
+        mkdir -p bin
+        # If the user has a script to pull ffmpeg/gs, it would run here.
+        # Otherwise, the app acts normally but misses deps unless bundled.
+        
+    - name: Build Executable via PyInstaller
+      run: |
+        python build_release.py 
+      # Assuming build_release.py creates /dist/Clyro/Clyro.exe
+        
+    - name: Compile Inno Setup Installer
+      uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+      with:
+        path: clyro.iss
+        
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          dist/ClyroSetup.exe
+        generate_release_notes: true

@@ -1,4 +1,3 @@
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -6,7 +5,7 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QProgressBar, QFrame, QApplication
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize, QMimeData, QUrl, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal, QMimeData, QUrl, QTimer
 from PyQt6.QtGui import QIcon, QDrag, QMouseEvent
 import logging
 
@@ -220,7 +219,6 @@ class ResultCard(QWidget):
             return
             
         from PyQt6.QtWidgets import QMenu
-        from PyQt6.QtGui import QAction
         
         menu = QMenu(self)
         menu.setStyleSheet("""

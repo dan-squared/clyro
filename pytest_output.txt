@@ -1,0 +1,35 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\hp\Downloads\Projects\Clyro
+configfile: pyproject.toml
+collected 2 items
+
+tests\test_smoke.py .F                                                   [100%]
+
+================================== FAILURES ===================================
+____________________________ test_config_defaults _____________________________
+
+    def test_config_defaults():
+        """Verify config falls back to sensible defaults without a file."""
+        try:
+>           from clyro.config.settings import Settings
+E           ModuleNotFoundError: No module named 'clyro.config.settings'
+
+tests\test_smoke.py:18: ModuleNotFoundError
+
+During handling of the above exception, another exception occurred:
+
+    def test_config_defaults():
+        """Verify config falls back to sensible defaults without a file."""
+        try:
+            from clyro.config.settings import Settings
+            settings = Settings()
+            assert settings is not None
+        except Exception as e:
+>           pytest.fail(f"Failed to load settings: {e}")
+E           Failed: Failed to load settings: No module named 'clyro.config.settings'
+
+tests\test_smoke.py:22: Failed
+=========================== short test summary info ===========================
+FAILED tests/test_smoke.py::test_config_defaults - Failed: Failed to load set...
+========================= 1 failed, 1 passed in 0.43s =========================

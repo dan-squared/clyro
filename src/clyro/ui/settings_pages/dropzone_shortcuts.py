@@ -1,7 +1,6 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QFrame, QLineEdit
+    QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QFrame
 )
-from PyQt6.QtCore import Qt
 
 LABEL_STYLE = "font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.45); letter-spacing: 0.8px;"
 SECTION_STYLE = """

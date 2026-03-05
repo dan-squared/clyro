@@ -1,6 +1,5 @@
 import json
 import logging
-from pathlib import Path
 from dataclasses import asdict
 
 from clyro.config.schema import Settings

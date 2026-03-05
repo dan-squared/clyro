@@ -3,7 +3,6 @@ import asyncio
 from threading import Thread
 import logging
 from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
-from PyQt6.QtWidgets import QApplication
 from clyro.core.types import DropIntent
 from pathlib import Path
 

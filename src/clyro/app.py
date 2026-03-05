@@ -22,6 +22,8 @@ from clyro.ui.settings_window import SettingsWindow
 from clyro.ui.tray import TrayIcon
 from clyro.ui.theme import Theme
 from clyro.ipc.server import IpcServer
+from clyro.updater import AutoUpdater
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,9 @@ class AppManager:
             
         # Start hidden by default; user summons it via tray or global shortcut
         self.dropzone.show()
+        
+        # Start updater asynchronously
+        self._check_for_updates()
         
         # IPC
         self.ipc = IpcServer(self.dropzone)
@@ -213,6 +218,30 @@ class AppManager:
                 pass
         except Exception:
             pass  # process already gone
+
+    def _check_for_updates(self):
+        """Spawns an async task to check for updates using the background thread."""
+        try:
+            # Note: We hardcode version to match pyproject.toml "0.1.0"
+            updater = AutoUpdater(current_version="0.1.0")
+            
+            # Since we are in PyQt, we likely don't have a main async loop,
+            # so we queue this up via the existing queue_service threading, or run it directly.
+            def _run_updater():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                update_info = loop.run_until_complete(updater.check_for_updates())
+                if update_info:
+                    logger.info(f"Update available to {update_info['version']}. Downloading...")
+                    loop.run_until_complete(updater.download_and_install(update_info["download_url"]))
+                loop.close()
+
+            # Offload to PyQt QThread / worker or plain threading
+            import threading
+            t = threading.Thread(target=_run_updater, daemon=True)
+            t.start()
+        except Exception as e:
+            logger.error(f"Updater failure: {e}")
 
     def quit(self):
         self.dropzone.quit()    # cancel in-flight downloads first

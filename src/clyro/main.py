@@ -1,5 +1,4 @@
 import sys
-import os
 
 def _check_vcruntime():
     """Check for VC++ runtime before anything else — PyQt6 needs it."""
@@ -26,11 +25,8 @@ if sys.platform == "win32":
 
 import logging
 import logging.handlers
-import socket
 import http.client
-import json
 import time
-from pathlib import Path
 from PyQt6.QtWidgets import QApplication
 import multiprocessing
 
@@ -142,7 +138,7 @@ def main():
     # Keep the application running in the background (for system tray support)
     qt_app.setQuitOnLastWindowClosed(False)
     
-    manager = AppManager(qt_app, app_icon)
+    AppManager(qt_app, app_icon)
     
     sys.exit(qt_app.exec())
 

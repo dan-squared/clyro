@@ -3,7 +3,6 @@ from importlib.metadata import version as _pkg_version, PackageNotFoundError
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 )
-from PyQt6.QtCore import Qt
 
 try:
     _CLYRO_VERSION = _pkg_version("clyro")

@@ -11,6 +11,9 @@ SolidCompression=yes
 SetupIconFile=src\clyro\assets\icons\app\256.ico
 UninstallDisplayIcon={app}\Clyro.exe
 PrivilegesRequired=lowest
+CloseApplications=yes
+RestartApplications=yes
+AppMutex=ClyroSingleInstanceMutex
 
 [Files]
 Source: "dist\Clyro\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

@@ -80,11 +80,12 @@ You do not need to install system-wide dependencies if you don't want to! You ca
 ### 2. Install Dependencies
 It is highly recommended to use a virtual environment.
 ```bash
-git clone https://github.com/your-username/clyro.git
+git clone https://github.com/dan-squared/clyro.git
 cd clyro
 python -m venv venv
 venv\Scripts\activate
-# Install in editable mode
+# Install dependencies and app in editable mode
+pip install -r requirements.txt
 pip install -e .
 ```
 

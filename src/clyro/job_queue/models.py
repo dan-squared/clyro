@@ -1,6 +1,4 @@
-from dataclasses import dataclass, field
-from queue import Queue
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 from clyro.core.types import JobSnapshot, Command, Result
 
 class WorkerSignals(QObject):

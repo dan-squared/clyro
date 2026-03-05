@@ -1,5 +1,5 @@
 import logging
-from PyQt6.QtCore import QRunnable, QObject, QThreadPool
+from PyQt6.QtCore import QRunnable
 from clyro.job_queue.models import Job, WorkerSignals
 from clyro.errors import ClyroError
 

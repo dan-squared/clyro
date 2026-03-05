@@ -38,7 +38,8 @@ class ToolAvailability:
         return None
 
 def discover_tools() -> ToolAvailability:
-    import sys, os
+    import sys
+    import os
     from clyro.utils.paths import get_bundle_dir
 
     bundle_dir = get_bundle_dir()

@@ -3,14 +3,13 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
     QFrame, QPushButton, QProgressBar, QGraphicsDropShadowEffect,
-    QStackedWidget, QSizePolicy
+    QStackedWidget
 )
 from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QIcon, QColor, QCursor
 
 from clyro.core.types import DropIntent, OptimiseCommand, ConvertCommand, MediaType
 from clyro.core.classify import classify, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, DOCUMENT_EXTENSIONS
-from clyro.ui.result_card import ResultCard
 
 logger = logging.getLogger(__name__)
 
@@ -645,7 +644,7 @@ class DropzoneWindow(QWidget):
         def _on_completed(temp_path: Path, orig_url: str):
             worker.wait()  # ensure the thread has fully exited before we clean up
             self._download_workers.pop(job_id, None)
-            from clyro.core.types import OptimiseCommand, ConvertCommand
+            from clyro.core.types import OptimiseCommand
             import shutil
             
             output_folder = self.settings.web_download_folder
@@ -699,7 +698,7 @@ class DropzoneWindow(QWidget):
                 self._s_close.setIcon(_icon("x-bold.svg"))
                 self._s_center.setCurrentIndex(1)
                 self._s_diff.setText("Failed")
-                self._s_res_lbl.setText(f"<span style='color:rgba(220,80,80,0.85);'>Download Failed</span>")
+                self._s_res_lbl.setText("<span style='color:rgba(220,80,80,0.85);'>Download Failed</span>")
                 self._btn_undo.show()
             elif job_id in self._batch_items:
                 self._batch_items[job_id].set_failed("Download failed")
@@ -1150,7 +1149,8 @@ class DropzoneWindow(QWidget):
         clipboard.setMimeData(mime)
 
     def _reveal_single(self):
-        import sys, subprocess
+        import sys
+        import subprocess
         if self._single_result and self._single_result.exists():
             if sys.platform == "win32":
                 subprocess.call(["explorer", "/select,", str(self._single_result)])
@@ -1204,7 +1204,7 @@ class DropzoneWindow(QWidget):
     def _clear_all(self):
         for item in list(self._batch_items.values()):
             self._items_lay.removeWidget(item); item.deleteLater()
-        self._batch_items.clear(); 
+        self._batch_items.clear() 
         self.queue.clear_history() 
         self._reset_to_idle()
 
@@ -1253,7 +1253,10 @@ class DropzoneWindow(QWidget):
         if not paths: return
 
         from PyQt6.QtWidgets import QFileDialog
-        import shutil, sys, os, subprocess
+        import shutil
+        import sys
+        import os
+        import subprocess
 
         dest_dir = QFileDialog.getExistingDirectory(self, "Select Destination Folder")
         if not dest_dir: return
@@ -1310,7 +1313,9 @@ class DropzoneWindow(QWidget):
         if e.button() == Qt.MouseButton.LeftButton:
             if self._shell_stack.currentIndex() == 1 and self._s_center.currentIndex() == 1:
                 if self._single_result and self._single_result.exists():
-                    import os, sys, subprocess
+                    import os
+                    import sys
+                    import subprocess
                     if sys.platform == "win32":
                         os.startfile(self._single_result)
                     elif sys.platform == "darwin":
@@ -1540,7 +1545,9 @@ class BatchItem(QWidget):
     def mouseDoubleClickEvent(self, event):
         """Double-click to open result."""
         if event.button() == Qt.MouseButton.LeftButton and self.output_path and self.output_path.exists():
-            import os, sys, subprocess
+            import os
+            import sys
+            import subprocess
             if sys.platform == "win32":
                 os.startfile(self.output_path)
             elif sys.platform == "darwin":

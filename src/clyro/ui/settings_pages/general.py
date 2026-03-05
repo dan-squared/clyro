@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import (
     QComboBox
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
 
 LABEL_STYLE = "font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.45); letter-spacing: 0.8px;"
 SECTION_STYLE = """
@@ -313,7 +312,6 @@ class GeneralPage(QWidget):
             self.folder_edit.setText(path)
 
     def _browse_web_folder(self):
-        from pathlib import Path
         default_dir = self.web_folder_edit.text() or str(Path.home() / "Downloads")
         path = QFileDialog.getExistingDirectory(self, "Select Web Download Folder", default_dir)
         if path:

@@ -2,8 +2,7 @@ from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QVBoxLayout, QLabel, QPushButton,
     QWidget, QStackedWidget, QScrollArea, QFrame
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
-from PyQt6.QtGui import QIcon, QFont
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from clyro.ui.settings_pages.general import GeneralPage
 from clyro.ui.settings_pages.quality import QualityPage

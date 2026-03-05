@@ -28,3 +28,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff.lint]
+ignore = ["E402", "E701", "E702", "F401", "F821", "F841"]

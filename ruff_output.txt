@@ -1,0 +1,2053 @@
+F401 [*] `dataclasses.field` imported but unused
+ --> src\clyro\config\schema.py:1:36
+  |
+1 | from dataclasses import dataclass, field
+  |                                    ^^^^^
+2 | from typing import Literal
+  |
+help: Remove unused import: `dataclasses.field`
+
+F401 [*] `pathlib.Path` imported but unused
+ --> src\clyro\config\store.py:3:21
+  |
+1 | import json
+2 | import logging
+3 | from pathlib import Path
+  |                     ^^^^
+4 | from dataclasses import asdict
+  |
+help: Remove unused import: `pathlib.Path`
+
+F821 Undefined name `Job`
+  --> src\clyro\core\convert.py:17:124
+   |
+15 |         }
+16 |         
+17 |     def convert(self, source: Path, target_format: str, out_path: Path, src_type: MediaType, tgt_type: str, signals, job: 'Job') -> ReΓÇª
+   |                                                                                                                            ^^^
+18 |         src_str = "image" if src_type == MediaType.IMAGE else ("video" if src_type == MediaType.VIDEO else "document")
+19 |         key = (src_str, tgt_type)
+   |
+
+F821 Undefined name `Job`
+  --> src\clyro\core\convert.py:27:101
+   |
+25 |         return handler.convert(source, target_format, out_path, signals, job)
+26 |
+27 |     def merge_to_pdf(self, sources: list[Path], out_path: Path, src_type: MediaType, signals, job: 'Job') -> Result:
+   |                                                                                                     ^^^
+28 |         src_str = "image" if src_type == MediaType.IMAGE else ("video" if src_type == MediaType.VIDEO else "document")
+29 |         # Currently we only support merging images into a PDF
+   |
+
+F821 Undefined name `Job`
+  --> src\clyro\core\dispatcher.py:63:52
+   |
+61 |         return result
+62 |
+63 |     def execute(self, cmd: Command, signals, job: 'Job') -> Result:
+   |                                                    ^^^
+64 |         media_type = classify(cmd.path)
+65 |         if media_type == MediaType.UNSUPPORTED:
+   |
+
+F821 Undefined name `Job`
+   --> src\clyro\core\image.py:121:87
+    |
+119 |     # ------------------------------------------------------------------
+120 |
+121 |     def optimize(self, source: Path, out_path: Path, aggressive: bool, signals, job: 'Job') -> Result:
+    |                                                                                       ^^^
+122 |         signals.progress.emit(job.id, (5, "Analyzing imageΓÇª"))
+123 |         orig_size = source.stat().st_size
+    |
+
+F821 Undefined name `Job`
+   --> src\clyro\core\image.py:230:58
+    |
+228 |     def _parallel_trial(
+229 |         self, img: Image.Image, source: Path, primary_out: Path,
+230 |         real_type: str, aggressive: bool, signals, job: 'Job',
+    |                                                          ^^^
+231 |     ) -> Path:
+232 |         """Run primary + alternate format optimization concurrently, keep the smaller."""
+    |
+
+F821 Undefined name `Job`
+   --> src\clyro\core\image.py:317:67
+    |
+315 |     def _optimize_single(
+316 |         self, img: Image.Image, source: Path, out_path: Path,
+317 |         target_type: str, real_type: str, aggressive: bool, job: 'Job',
+    |                                                                   ^^^
+318 |     ) -> bool:
+319 |         """Optimise using the best available external tool.  Returns True on success."""
+    |
+
+F821 Undefined name `Job`
+   --> src\clyro\core\image.py:357:84
+    |
+355 |     # ------------------------------------------------------------------
+356 |
+357 |     def _optimize_jpeg(self, source: Path, out_path: Path, aggressive: bool, job: 'Job') -> bool:
+    |                                                                                    ^^^
+358 |         if not self.tools.jpegoptim:
+359 |             return False
+    |
+
+F821 Undefined name `Job`
+   --> src\clyro\core\image.py:401:83
+    |
+399 |         return out_path.exists()
+400 |
+401 |     def _optimize_png(self, source: Path, out_path: Path, aggressive: bool, job: 'Job') -> bool:
+    |                                                                                   ^^^
+402 |         if not self.tools.pngquant:
+403 |             return False
+    |
+
+F821 Undefined name `Job`
+   --> src\clyro\core\image.py:430:83
+    |
+428 |         return True
+429 |
+430 |     def _optimize_gif(self, source: Path, out_path: Path, aggressive: bool, job: 'Job') -> bool:
+    |                                                                                   ^^^
+431 |         if not self.tools.gifsicle:
+432 |             return False
+    |
+
+F821 Undefined name `Job`
+   --> src\clyro\core\image.py:557:88
+    |
+555 |         self.tools = tools
+556 |
+557 |     def convert(self, source: Path, target_format: str, out_path: Path, signals, job: 'Job') -> Result:
+    |                                                                                        ^^^
+558 |         signals.progress.emit(job.id, (10, "Opening imageΓÇª"))
+559 |         orig_size = source.stat().st_size
+    |
+
+F821 Undefined name `Job`
+   --> src\clyro\core\image.py:624:88
+    |
+622 |         self.tools = tools
+623 |
+624 |     def convert(self, source: Path, target_format: str, out_path: Path, signals, job: 'Job') -> Result:
+    |                                                                                        ^^^
+625 |         signals.progress.emit(job.id, (10, "Opening imageΓÇª"))
+626 |         orig_size = source.stat().st_size
+    |
+
+F821 Undefined name `Job`
+   --> src\clyro\core\image.py:644:73
+    |
+642 |         return Result(source, out_path, orig_size, out_path.stat().st_size, resolution=res)
+643 |
+644 |     def merge(self, sources: list[Path], out_path: Path, signals, job: 'Job') -> Result:
+    |                                                                         ^^^
+645 |         signals.progress.emit(job.id, (0, "Starting mergeΓÇª"))
+    |
+
+F821 Undefined name `Job`
+  --> src\clyro\core\optimize.py:10:110
+   |
+ 8 |         self.pdf = pdf_handler
+ 9 |         
+10 |     def optimize(self, source: Path, out_path: Path, media_type: MediaType, aggressive: bool, signals, job: 'Job') -> Result:
+   |                                                                                                              ^^^
+11 |         if media_type == MediaType.IMAGE:
+12 |             return self.image.optimize(source, out_path, aggressive, signals, job)
+   |
+
+F401 [*] `os` imported but unused
+ --> src\clyro\core\output.py:1:8
+  |
+1 | import os
+  |        ^^
+2 | import logging
+3 | from pathlib import Path
+  |
+help: Remove unused import: `os`
+
+F821 Undefined name `Job`
+   --> src\clyro\core\pdf.py:127:87
+    |
+125 |         self.tools = tools
+126 |
+127 |     def optimize(self, source: Path, out_path: Path, aggressive: bool, signals, job: 'Job') -> Result:
+    |                                                                                       ^^^
+128 |         signals.progress.emit(job.id, (0, "Starting..."))
+129 |         orig_size = source.stat().st_size
+    |
+
+F821 Undefined name `Job`
+   --> src\clyro\core\pdf.py:222:88
+    |
+220 |         self.tools = tools
+221 |         
+222 |     def convert(self, source: Path, target_format: str, out_path: Path, signals, job: 'Job') -> Result:
+    |                                                                                        ^^^
+223 |         signals.progress.emit(job.id, 0.1)
+224 |         orig_size = source.stat().st_size
+    |
+
+F821 Undefined name `Job`
+   --> src\clyro\core\pdf.py:250:88
+    |
+248 |         self.tools = tools
+249 |         
+250 |     def convert(self, source: Path, target_format: str, out_path: Path, signals, job: 'Job') -> Result:
+    |                                                                                        ^^^
+251 |         signals.progress.emit(job.id, (10.0, "Initializing..."))
+252 |         orig_size = source.stat().st_size
+    |
+
+E701 Multiple statements on one line (colon)
+   --> src\clyro\core\pdf.py:294:36
+    |
+293 |             def make_docx(self, docx_filename=None, **kwargs):
+294 |                 if job.is_cancelled: return
+    |                                    ^
+295 |                 signals.progress.emit(job.id, (75.0, "Generating Word Document..."))
+296 |                 res = super().make_docx(docx_filename, **kwargs)
+    |
+
+E701 Multiple statements on one line (colon)
+  --> src\clyro\core\tools.py:24:34
+   |
+22 |         if media_type == MediaType.IMAGE:
+23 |             missing = []
+24 |             if not self.jpegoptim: missing.append("jpegoptim")
+   |                                  ^
+25 |             if not self.pngquant: missing.append("pngquant")
+26 |             if not self.gifsicle: missing.append("gifsicle")
+   |
+
+E701 Multiple statements on one line (colon)
+  --> src\clyro\core\tools.py:25:33
+   |
+23 |             missing = []
+24 |             if not self.jpegoptim: missing.append("jpegoptim")
+25 |             if not self.pngquant: missing.append("pngquant")
+   |                                 ^
+26 |             if not self.gifsicle: missing.append("gifsicle")
+27 |             if missing:
+   |
+
+E701 Multiple statements on one line (colon)
+  --> src\clyro\core\tools.py:26:33
+   |
+24 |             if not self.jpegoptim: missing.append("jpegoptim")
+25 |             if not self.pngquant: missing.append("pngquant")
+26 |             if not self.gifsicle: missing.append("gifsicle")
+   |                                 ^
+27 |             if missing:
+28 |                 import logging
+   |
+
+E401 [*] Multiple imports on one line
+  --> src\clyro\core\tools.py:41:5
+   |
+40 | def discover_tools() -> ToolAvailability:
+41 |     import sys, os
+   |     ^^^^^^^^^^^^^^
+42 |     from clyro.utils.paths import get_bundle_dir
+   |
+help: Split imports
+
+F401 `mozjpeg_lossless_optimization` imported but unused; consider using `importlib.util.find_spec` to test for availability
+  --> src\clyro\core\tools.py:92:16
+   |
+91 |     try:
+92 |         import mozjpeg_lossless_optimization
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+93 |         mozjpeg_available = True
+94 |     except ImportError:
+   |
+help: Remove unused import: `mozjpeg_lossless_optimization`
+
+F821 Undefined name `Job`
+   --> src\clyro\core\video.py:239:87
+    |
+237 |         return self._hw_encoder
+238 |
+239 |     def optimize(self, source: Path, out_path: Path, aggressive: bool, signals, job: 'Job') -> Result:
+    |                                                                                       ^^^
+240 |         signals.progress.emit(job.id, (0, "Analyzing videoΓÇª"))
+241 |         orig_size = source.stat().st_size
+    |
+
+F821 Undefined name `Job`
+   --> src\clyro\core\video.py:372:88
+    |
+370 |         self.tools = tools
+371 |
+372 |     def convert(self, source: Path, target_format: str, out_path: Path, signals, job: 'Job') -> Result:
+    |                                                                                        ^^^
+373 |         signals.progress.emit(job.id, (0, "Analyzing videoΓÇª"))
+374 |         orig_size = source.stat().st_size
+    |
+
+F821 Undefined name `Job`
+   --> src\clyro\core\video.py:452:88
+    |
+450 |         self.tools = tools
+451 |
+452 |     def convert(self, source: Path, target_format: str, out_path: Path, signals, job: 'Job') -> Result:
+    |                                                                                        ^^^
+453 |         signals.progress.emit(job.id, (0, "Analyzing videoΓÇª"))
+454 |         orig_size = source.stat().st_size
+    |
+
+F401 [*] `PyQt6.QtWidgets.QApplication` imported but unused
+ --> src\clyro\ipc\server.py:6:29
+  |
+4 | import logging
+5 | from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+6 | from PyQt6.QtWidgets import QApplication
+  |                             ^^^^^^^^^^^^
+7 | from clyro.core.types import DropIntent
+8 | from pathlib import Path
+  |
+help: Remove unused import: `PyQt6.QtWidgets.QApplication`
+
+F401 [*] `dataclasses.dataclass` imported but unused
+ --> src\clyro\job_queue\models.py:1:25
+  |
+1 | from dataclasses import dataclass, field
+  |                         ^^^^^^^^^
+2 | from queue import Queue
+3 | from PyQt6.QtCore import QObject, QThread, pyqtSignal
+  |
+help: Remove unused import
+
+F401 [*] `dataclasses.field` imported but unused
+ --> src\clyro\job_queue\models.py:1:36
+  |
+1 | from dataclasses import dataclass, field
+  |                                    ^^^^^
+2 | from queue import Queue
+3 | from PyQt6.QtCore import QObject, QThread, pyqtSignal
+  |
+help: Remove unused import
+
+F401 [*] `queue.Queue` imported but unused
+ --> src\clyro\job_queue\models.py:2:19
+  |
+1 | from dataclasses import dataclass, field
+2 | from queue import Queue
+  |                   ^^^^^
+3 | from PyQt6.QtCore import QObject, QThread, pyqtSignal
+4 | from clyro.core.types import JobSnapshot, Command, Result
+  |
+help: Remove unused import: `queue.Queue`
+
+F401 [*] `PyQt6.QtCore.QThread` imported but unused
+ --> src\clyro\job_queue\models.py:3:35
+  |
+1 | from dataclasses import dataclass, field
+2 | from queue import Queue
+3 | from PyQt6.QtCore import QObject, QThread, pyqtSignal
+  |                                   ^^^^^^^
+4 | from clyro.core.types import JobSnapshot, Command, Result
+  |
+help: Remove unused import: `PyQt6.QtCore.QThread`
+
+F821 Undefined name `Path`
+  --> src\clyro\job_queue\models.py:23:28
+   |
+21 |         self.error_detail: str | None = None
+22 |         self.is_cancelled: bool = False
+23 |         self.backup_path: 'Path | None' = None  # Set by dispatcher for restore
+   |                            ^^^^
+24 |
+25 |     def snapshot(self) -> JobSnapshot:
+   |
+
+F401 [*] `PyQt6.QtCore.QObject` imported but unused
+ --> src\clyro\job_queue\worker.py:2:37
+  |
+1 | import logging
+2 | from PyQt6.QtCore import QRunnable, QObject, QThreadPool
+  |                                     ^^^^^^^
+3 | from clyro.job_queue.models import Job, WorkerSignals
+4 | from clyro.errors import ClyroError
+  |
+help: Remove unused import
+
+F401 [*] `PyQt6.QtCore.QThreadPool` imported but unused
+ --> src\clyro\job_queue\worker.py:2:46
+  |
+1 | import logging
+2 | from PyQt6.QtCore import QRunnable, QObject, QThreadPool
+  |                                              ^^^^^^^^^^^
+3 | from clyro.job_queue.models import Job, WorkerSignals
+4 | from clyro.errors import ClyroError
+  |
+help: Remove unused import
+
+F401 [*] `os` imported but unused
+ --> src\clyro\main.py:2:8
+  |
+1 | import sys
+2 | import os
+  |        ^^
+3 |
+4 | def _check_vcruntime():
+  |
+help: Remove unused import: `os`
+
+E402 Module level import not at top of file
+  --> src\clyro\main.py:27:1
+   |
+25 |     _check_vcruntime()
+26 |
+27 | import logging
+   | ^^^^^^^^^^^^^^
+28 | import logging.handlers
+29 | import socket
+   |
+
+E402 Module level import not at top of file
+  --> src\clyro\main.py:28:1
+   |
+27 | import logging
+28 | import logging.handlers
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+29 | import socket
+30 | import http.client
+   |
+
+E402 Module level import not at top of file
+  --> src\clyro\main.py:29:1
+   |
+27 | import logging
+28 | import logging.handlers
+29 | import socket
+   | ^^^^^^^^^^^^^
+30 | import http.client
+31 | import json
+   |
+
+F401 [*] `socket` imported but unused
+  --> src\clyro\main.py:29:8
+   |
+27 | import logging
+28 | import logging.handlers
+29 | import socket
+   |        ^^^^^^
+30 | import http.client
+31 | import json
+   |
+help: Remove unused import: `socket`
+
+E402 Module level import not at top of file
+  --> src\clyro\main.py:30:1
+   |
+28 | import logging.handlers
+29 | import socket
+30 | import http.client
+   | ^^^^^^^^^^^^^^^^^^
+31 | import json
+32 | import time
+   |
+
+E402 Module level import not at top of file
+  --> src\clyro\main.py:31:1
+   |
+29 | import socket
+30 | import http.client
+31 | import json
+   | ^^^^^^^^^^^
+32 | import time
+33 | from pathlib import Path
+   |
+
+F401 [*] `json` imported but unused
+  --> src\clyro\main.py:31:8
+   |
+29 | import socket
+30 | import http.client
+31 | import json
+   |        ^^^^
+32 | import time
+33 | from pathlib import Path
+   |
+help: Remove unused import: `json`
+
+E402 Module level import not at top of file
+  --> src\clyro\main.py:32:1
+   |
+30 | import http.client
+31 | import json
+32 | import time
+   | ^^^^^^^^^^^
+33 | from pathlib import Path
+34 | from PyQt6.QtWidgets import QApplication
+   |
+
+E402 Module level import not at top of file
+  --> src\clyro\main.py:33:1
+   |
+31 | import json
+32 | import time
+33 | from pathlib import Path
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+34 | from PyQt6.QtWidgets import QApplication
+35 | import multiprocessing
+   |
+
+F401 [*] `pathlib.Path` imported but unused
+  --> src\clyro\main.py:33:21
+   |
+31 | import json
+32 | import time
+33 | from pathlib import Path
+   |                     ^^^^
+34 | from PyQt6.QtWidgets import QApplication
+35 | import multiprocessing
+   |
+help: Remove unused import: `pathlib.Path`
+
+E402 Module level import not at top of file
+  --> src\clyro\main.py:34:1
+   |
+32 | import time
+33 | from pathlib import Path
+34 | from PyQt6.QtWidgets import QApplication
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+35 | import multiprocessing
+   |
+
+E402 Module level import not at top of file
+  --> src\clyro\main.py:35:1
+   |
+33 | from pathlib import Path
+34 | from PyQt6.QtWidgets import QApplication
+35 | import multiprocessing
+   | ^^^^^^^^^^^^^^^^^^^^^^
+36 |
+37 | from clyro.utils.paths import get_app_data_dir, resource_path
+   |
+
+E402 Module level import not at top of file
+  --> src\clyro\main.py:37:1
+   |
+35 | import multiprocessing
+36 |
+37 | from clyro.utils.paths import get_app_data_dir, resource_path
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+38 | from clyro.app import AppManager
+39 | from PyQt6.QtGui import QIcon
+   |
+
+E402 Module level import not at top of file
+  --> src\clyro\main.py:38:1
+   |
+37 | from clyro.utils.paths import get_app_data_dir, resource_path
+38 | from clyro.app import AppManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+39 | from PyQt6.QtGui import QIcon
+40 | import ctypes
+   |
+
+E402 Module level import not at top of file
+  --> src\clyro\main.py:39:1
+   |
+37 | from clyro.utils.paths import get_app_data_dir, resource_path
+38 | from clyro.app import AppManager
+39 | from PyQt6.QtGui import QIcon
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+40 | import ctypes
+   |
+
+E402 Module level import not at top of file
+  --> src\clyro\main.py:40:1
+   |
+38 | from clyro.app import AppManager
+39 | from PyQt6.QtGui import QIcon
+40 | import ctypes
+   | ^^^^^^^^^^^^^
+41 |
+42 | def setup_logging():
+   |
+
+F841 Local variable `manager` is assigned to but never used
+   --> src\clyro\main.py:145:5
+    |
+143 |     qt_app.setQuitOnLastWindowClosed(False)
+144 |     
+145 |     manager = AppManager(qt_app, app_icon)
+    |     ^^^^^^^
+146 |     
+147 |     sys.exit(qt_app.exec())
+    |
+help: Remove assignment to unused variable `manager`
+
+F401 [*] `PyQt6.QtWidgets.QSizePolicy` imported but unused
+ --> src\clyro\ui\dropzone.py:6:21
+  |
+4 |     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
+5 |     QFrame, QPushButton, QProgressBar, QGraphicsDropShadowEffect,
+6 |     QStackedWidget, QSizePolicy
+  |                     ^^^^^^^^^^^
+7 | )
+8 | from PyQt6.QtCore import Qt, QSize, QTimer
+  |
+help: Remove unused import: `PyQt6.QtWidgets.QSizePolicy`
+
+F401 [*] `clyro.ui.result_card.ResultCard` imported but unused
+  --> src\clyro\ui\dropzone.py:13:34
+   |
+11 | from clyro.core.types import DropIntent, OptimiseCommand, ConvertCommand, MediaType
+12 | from clyro.core.classify import classify, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, DOCUMENT_EXTENSIONS
+13 | from clyro.ui.result_card import ResultCard
+   |                                  ^^^^^^^^^^
+14 |
+15 | logger = logging.getLogger(__name__)
+   |
+help: Remove unused import: `clyro.ui.result_card.ResultCard`
+
+E701 Multiple statements on one line (colon)
+  --> src\clyro\ui\dropzone.py:35:16
+   |
+34 | def _fmt(b: int) -> str:
+35 |     if b < 1024:        return f"{b} B"
+   |                ^
+36 |     if b < 1024 ** 2:   return f"{b/1024:.0f} KB"
+37 |     return f"{b/(1024**2):.1f} MB"
+   |
+
+E701 Multiple statements on one line (colon)
+  --> src\clyro\ui\dropzone.py:36:21
+   |
+34 | def _fmt(b: int) -> str:
+35 |     if b < 1024:        return f"{b} B"
+36 |     if b < 1024 ** 2:   return f"{b/1024:.0f} KB"
+   |                     ^
+37 |     return f"{b/(1024**2):.1f} MB"
+   |
+
+E702 Multiple statements on one line (semicolon)
+  --> src\clyro\ui\dropzone.py:87:29
+   |
+85 |         self._shell.setCursor(QCursor(Qt.CursorShape.OpenHandCursor))
+86 |         sh = QGraphicsDropShadowEffect(self._shell)
+87 |         sh.setBlurRadius(18); sh.setOffset(0, 7)
+   |                             ^
+88 |         sh.setColor(QColor(0, 0, 0, 120))
+89 |         self._shell.setGraphicsEffect(sh)
+   |
+
+E702 Multiple statements on one line (semicolon)
+  --> src\clyro\ui\dropzone.py:92:42
+   |
+91 |         sl = QVBoxLayout(self._shell)
+92 |         sl.setContentsMargins(0, 0, 0, 0); sl.setSpacing(0)
+   |                                          ^
+93 |
+94 |         self._shell_stack = QStackedWidget()
+   |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:196:22
+    |
+195 |     def _build_idle_page(self) -> QWidget:
+196 |         p = QWidget(); p.setFixedWidth(SHELL_W)
+    |                      ^
+197 |         lay = QVBoxLayout(p)
+198 |         lay.setContentsMargins(16, 28, 16, 28)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:209:40
+    |
+207 |         self._idle_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+208 |         self._idle_hint.setStyleSheet("font-family: 'Segoe UI Symbol', sans-serif; font-size:12px; color:rgba(255,255,255,0.45);")
+209 |         lay.addWidget(self._idle_title); lay.addSpacing(6); lay.addWidget(self._idle_hint)
+    |                                        ^
+210 |         return p
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:209:59
+    |
+207 |         self._idle_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+208 |         self._idle_hint.setStyleSheet("font-family: 'Segoe UI Symbol', sans-serif; font-size:12px; color:rgba(255,255,255,0.45);")
+209 |         lay.addWidget(self._idle_title); lay.addSpacing(6); lay.addWidget(self._idle_hint)
+    |                                                           ^
+210 |         return p
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:214:22
+    |
+212 |     def _build_single_content(self) -> QWidget:
+213 |         """Content area ONLY ΓÇö action buttons live outside the shell."""
+214 |         p = QWidget(); p.setFixedWidth(SHELL_W)
+    |                      ^
+215 |         lay = QVBoxLayout(p)
+216 |         lay.setContentsMargins(14, 14, 14, 14); lay.setSpacing(0)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:216:47
+    |
+214 |         p = QWidget(); p.setFixedWidth(SHELL_W)
+215 |         lay = QVBoxLayout(p)
+216 |         lay.setContentsMargins(14, 14, 14, 14); lay.setSpacing(0)
+    |                                               ^
+217 |
+218 |         # Header: close / type icon match exactly like top-left / top-right
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:219:28
+    |
+218 |         # Header: close / type icon match exactly like top-left / top-right
+219 |         hdr = QHBoxLayout(); hdr.setContentsMargins(0,0,0,0)
+    |                            ^
+220 |         self._s_close = QPushButton()
+221 |         self._s_close.setIcon(_icon("x-bold.svg"))
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:233:37
+    |
+231 |             "background:rgba(255,255,255,120);border-radius:6px;padding:4px;"
+232 |         )
+233 |         hdr.addWidget(self._s_close); hdr.addStretch(); hdr.addWidget(self._s_type_icon)
+    |                                     ^
+234 |         lay.addLayout(hdr)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:233:55
+    |
+231 |             "background:rgba(255,255,255,120);border-radius:6px;padding:4px;"
+232 |         )
+233 |         hdr.addWidget(self._s_close); hdr.addStretch(); hdr.addWidget(self._s_type_icon)
+    |                                                       ^
+234 |         lay.addLayout(hdr)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:239:25
+    |
+238 |         # ΓöÇΓöÇ Processing Page (Bottom-left aligned) ΓöÇΓöÇ
+239 |         proc = QWidget(); pl = QVBoxLayout(proc)
+    |                         ^
+240 |         pl.setContentsMargins(0,0,0,0); pl.setSpacing(0)
+241 |         pl.addStretch() # Push everything to the bottom
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:240:39
+    |
+238 |         # ΓöÇΓöÇ Processing Page (Bottom-left aligned) ΓöÇΓöÇ
+239 |         proc = QWidget(); pl = QVBoxLayout(proc)
+240 |         pl.setContentsMargins(0,0,0,0); pl.setSpacing(0)
+    |                                       ^
+241 |         pl.addStretch() # Push everything to the bottom
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:250:36
+    |
+249 |         self._s_bar = QProgressBar()
+250 |         self._s_bar.setRange(0,100); self._s_bar.setValue(0)
+    |                                    ^
+251 |         self._s_bar.setFixedHeight(3); self._s_bar.setTextVisible(False)
+252 |         self._s_bar.setStyleSheet("""
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:251:38
+    |
+249 |         self._s_bar = QProgressBar()
+250 |         self._s_bar.setRange(0,100); self._s_bar.setValue(0)
+251 |         self._s_bar.setFixedHeight(3); self._s_bar.setTextVisible(False)
+    |                                      ^
+252 |         self._s_bar.setStyleSheet("""
+253 |             QProgressBar{border:none;background:rgba(255,255,255,30);border-radius:2px;}
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:264:41
+    |
+262 |         self._s_detail.setWordWrap(False)
+263 |         
+264 |         pl.addWidget(self._s_proc_label); pl.addSpacing(6)
+    |                                         ^
+265 |         pl.addWidget(self._s_bar); pl.addSpacing(4); pl.addWidget(self._s_detail)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:265:34
+    |
+264 |         pl.addWidget(self._s_proc_label); pl.addSpacing(6)
+265 |         pl.addWidget(self._s_bar); pl.addSpacing(4); pl.addWidget(self._s_detail)
+    |                                  ^
+266 |
+267 |         # ΓöÇΓöÇ Result Page (Bottom-center aligned) ΓöÇΓöÇ
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:265:52
+    |
+264 |         pl.addWidget(self._s_proc_label); pl.addSpacing(6)
+265 |         pl.addWidget(self._s_bar); pl.addSpacing(4); pl.addWidget(self._s_detail)
+    |                                                    ^
+266 |
+267 |         # ΓöÇΓöÇ Result Page (Bottom-center aligned) ΓöÇΓöÇ
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:268:24
+    |
+267 |         # ΓöÇΓöÇ Result Page (Bottom-center aligned) ΓöÇΓöÇ
+268 |         res = QWidget(); rl = QVBoxLayout(res)
+    |                        ^
+269 |         rl.setContentsMargins(0,0,0,0); rl.setSpacing(0)
+270 |         rl.addStretch() # Push everything to the bottom
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:269:39
+    |
+267 |         # ΓöÇΓöÇ Result Page (Bottom-center aligned) ΓöÇΓöÇ
+268 |         res = QWidget(); rl = QVBoxLayout(res)
+269 |         rl.setContentsMargins(0,0,0,0); rl.setSpacing(0)
+    |                                       ^
+270 |         rl.addStretch() # Push everything to the bottom
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:285:25
+    |
+283 |         )
+284 |         rl.addWidget(self._s_diff)
+285 |         rl.addSpacing(4); rl.addWidget(self._s_res_lbl)
+    |                         ^
+286 |
+287 |         self._s_center.addWidget(proc); self._s_center.addWidget(res)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:287:39
+    |
+285 |         rl.addSpacing(4); rl.addWidget(self._s_res_lbl)
+286 |
+287 |         self._s_center.addWidget(proc); self._s_center.addWidget(res)
+    |                                       ^
+288 |         lay.addWidget(self._s_center)
+289 |         return p
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:295:43
+    |
+293 |         panel = QWidget()
+294 |         lay = QVBoxLayout(panel)
+295 |         lay.setContentsMargins(0, 0, 0, 0); lay.setSpacing(10)
+    |                                           ^
+296 |
+297 |         def _cb(svg: str) -> QPushButton:
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:299:36
+    |
+297 |         def _cb(svg: str) -> QPushButton:
+298 |             btn = QPushButton()
+299 |             btn.setIcon(_icon(svg)); btn.setIconSize(QSize(16,16))
+    |                                    ^
+300 |             btn.setFixedSize(32,32)
+301 |             btn.setStyleSheet("""
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:329:22
+    |
+328 |     def _build_batch_page(self) -> QWidget:
+329 |         p = QWidget(); p.setFixedWidth(SHELL_W)
+    |                      ^
+330 |         lay = QVBoxLayout(p)
+331 |         lay.setContentsMargins(0,0,0,0); lay.setSpacing(0)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:331:40
+    |
+329 |         p = QWidget(); p.setFixedWidth(SHELL_W)
+330 |         lay = QVBoxLayout(p)
+331 |         lay.setContentsMargins(0,0,0,0); lay.setSpacing(0)
+    |                                        ^
+332 |
+333 |         self._scroll = QScrollArea()
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:339:30
+    |
+337 |         self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+338 |
+339 |         container = QWidget(); container.setStyleSheet("background:transparent;")
+    |                              ^
+340 |         self._items_lay = QVBoxLayout(container)
+341 |         self._items_lay.setContentsMargins(8, 8, 8, 4)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:456:35
+    |
+455 |     def _show_name_pill(self, filename: str):
+456 |         stem = Path(filename).stem; ext = Path(filename).suffix
+    |                                   ^
+457 |         self._pill_stem.setText(stem[:20] + "ΓÇª" if len(stem) > 20 else stem)
+458 |         self._pill_ext.setText(ext)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:466:31
+    |
+464 |         # Moving this back up slightly to add a small gap
+465 |         self._name_pill.move(PAD_L, PAD_TOP - 28 + 4)
+466 |         self._name_pill.show(); self._name_pill.raise_()
+    |                               ^
+467 |
+468 |     def _position_pill(self, pill: QFrame):
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:482:20
+    |
+481 |         pill.move(px, py)
+482 |         pill.show(); pill.raise_()
+    |                    ^
+483 |
+484 |     def _position_conv_pill(self):
+    |
+
+E701 Multiple statements on one line (colon)
+   --> src\clyro\ui\dropzone.py:494:42
+    |
+492 |             return
+493 |
+494 |         if not event.mimeData().hasUrls(): return
+    |                                          ^
+495 |
+496 |         # Drop validation: reject unsupported-only drops
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:507:52
+    |
+505 |         )
+506 |         if not has_supported:
+507 |             self._idle_title.setText("Unsupported"); self._idle_hint.setText("Not a supported file type")
+    |                                                    ^
+508 |             self._shell.setProperty("drag", "true")
+509 |             self._shell.style().unpolish(self._shell); self._shell.style().polish(self._shell)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:509:54
+    |
+507 |             self._idle_title.setText("Unsupported"); self._idle_hint.setText("Not a supported file type")
+508 |             self._shell.setProperty("drag", "true")
+509 |             self._shell.style().unpolish(self._shell); self._shell.style().polish(self._shell)
+    |                                                      ^
+510 |             event.ignore()
+511 |             QTimer.singleShot(1500, lambda: (
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:520:50
+    |
+518 |         self._drag_over = True
+519 |         self._shell.setProperty("drag","true")
+520 |         self._shell.style().unpolish(self._shell); self._shell.style().polish(self._shell)
+    |                                                  ^
+521 |         self._update_drag_hints(event.modifiers())
+522 |         event.acceptProposedAction()
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:531:48
+    |
+529 |     def _update_drag_hints(self, mods):
+530 |         if mods & Qt.KeyboardModifier.AltModifier:
+531 |             self._idle_title.setText("Convert"); self._idle_hint.setText("Same type only")
+    |                                                ^
+532 |         elif mods & Qt.KeyboardModifier.ShiftModifier:
+533 |             self._idle_title.setText("Max compression"); self._idle_hint.setText("Aggressive")
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:533:56
+    |
+531 |             self._idle_title.setText("Convert"); self._idle_hint.setText("Same type only")
+532 |         elif mods & Qt.KeyboardModifier.ShiftModifier:
+533 |             self._idle_title.setText("Max compression"); self._idle_hint.setText("Aggressive")
+    |                                                        ^
+534 |         else:
+535 |             self._idle_title.setText("Optimise"); self._idle_hint.setText("Drop to process")
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:535:49
+    |
+533 |             self._idle_title.setText("Max compression"); self._idle_hint.setText("Aggressive")
+534 |         else:
+535 |             self._idle_title.setText("Optimise"); self._idle_hint.setText("Drop to process")
+    |                                                 ^
+536 |
+537 |     def dragLeaveEvent(self, event):
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:538:32
+    |
+537 |     def dragLeaveEvent(self, event):
+538 |         self._drag_over = False; self._clear_drag_style()
+    |                                ^
+539 |         self._idle_title.setText("Drop files"); self._idle_hint.setText("ΓîÑ Convert  ┬╖  Γçº Max")
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:539:47
+    |
+537 |     def dragLeaveEvent(self, event):
+538 |         self._drag_over = False; self._clear_drag_style()
+539 |         self._idle_title.setText("Drop files"); self._idle_hint.setText("ΓîÑ Convert  ┬╖  Γçº Max")
+    |                                               ^
+540 |
+541 |     def _clear_drag_style(self):
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:542:48
+    |
+541 |     def _clear_drag_style(self):
+542 |         self._shell.setProperty("drag","false"); self._shell.setProperty("mode","")
+    |                                                ^
+543 |         self._shell.style().unpolish(self._shell); self._shell.style().polish(self._shell)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:543:50
+    |
+541 |     def _clear_drag_style(self):
+542 |         self._shell.setProperty("drag","false"); self._shell.setProperty("mode","")
+543 |         self._shell.style().unpolish(self._shell); self._shell.style().polish(self._shell)
+    |                                                  ^
+544 |
+545 |     def dropEvent(self, event: QDropEvent):
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:546:32
+    |
+545 |     def dropEvent(self, event: QDropEvent):
+546 |         self._drag_over = False; self._clear_drag_style()
+    |                                ^
+547 |
+548 |         local_paths = []
+    |
+
+E701 Multiple statements on one line (colon)
+   --> src\clyro\ui\dropzone.py:563:44
+    |
+561 |                 web_urls.append(u.url())
+562 |
+563 |         if not local_paths and not web_urls: return
+    |                                            ^
+564 |
+565 |         mods = event.modifiers()
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:583:78
+    |
+581 |                 types = {classify(p) for p in local_paths}
+582 |                 if len(types) > 1 or MediaType.UNSUPPORTED in types:
+583 |                     self._flash_error("Same type required for batch convert"); return
+    |                                                                              ^
+584 |                 self._show_convert_pill(DropIntent(mode="convert", files=local_paths))
+585 |             elif intent_mode == "aggressive":
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:611:53
+    |
+609 |             self._s_center.setCurrentIndex(0)
+610 |             self._s_proc_label.setText("Downloading...")
+611 |             self._s_detail.setText("Downloading..."); self._s_bar.setValue(0)
+    |                                                     ^
+612 |             self._btn_undo.hide()
+613 |         else:
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:641:42
+    |
+639 |                 safe_detail = detail[:25]
+640 |                 text = f"{pct}% - {safe_detail}" if pct > 0 else f"{safe_detail}"
+641 |                 self._s_bar.setValue(pct); self._s_detail.setText(text)
+    |                                          ^
+642 |             elif job_id in self._batch_items:
+643 |                 self._batch_items[job_id].set_processing(pct, detail)
+    |
+
+F401 [*] `clyro.core.types.ConvertCommand` imported but unused
+   --> src\clyro\ui\dropzone.py:648:59
+    |
+646 |             worker.wait()  # ensure the thread has fully exited before we clean up
+647 |             self._download_workers.pop(job_id, None)
+648 |             from clyro.core.types import OptimiseCommand, ConvertCommand
+    |                                                           ^^^^^^^^^^^^^^
+649 |             import shutil
+    |
+help: Remove unused import: `clyro.core.types.ConvertCommand`
+
+F541 [*] f-string without any placeholders
+   --> src\clyro\ui\dropzone.py:702:41
+    |
+700 |                 self._s_center.setCurrentIndex(1)
+701 |                 self._s_diff.setText("Failed")
+702 |                 self._s_res_lbl.setText(f"<span style='color:rgba(220,80,80,0.85);'>Download Failed</span>")
+    |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+703 |                 self._btn_undo.show()
+704 |             elif job_id in self._batch_items:
+    |
+help: Remove extraneous `f` prefix
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:717:50
+    |
+715 |         self._idle_title.setStyleSheet("font-size:12px;font-weight:600;color:rgba(220,80,80,0.85);")
+716 |         self._shell.setProperty("mode","err")
+717 |         self._shell.style().unpolish(self._shell); self._shell.style().polish(self._shell)
+    |                                                  ^
+718 |         def _r():
+719 |             self._idle_title.setStyleSheet("font-size:16px;font-weight:700;color:rgba(255,255,255,0.9);")
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:720:51
+    |
+718 |         def _r():
+719 |             self._idle_title.setStyleSheet("font-size:16px;font-weight:700;color:rgba(255,255,255,0.9);")
+720 |             self._idle_title.setText("Drop files"); self._idle_hint.setText("ΓîÑ Convert  ┬╖  Γåæ Max")
+    |                                                   ^
+721 |             self._clear_drag_style()
+722 |         QTimer.singleShot(2000, _r)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:770:33
+    |
+768 |         self._conv_row.addStretch()
+769 |         for fmt in options:
+770 |             b = QPushButton(fmt); b.setStyleSheet(_B); b.clicked.connect(_h(fmt))
+    |                                 ^
+771 |             self._conv_row.addWidget(b)
+772 |         cx = QPushButton("Γ£ò"); cx.setStyleSheet(_C); cx.setFixedWidth(28)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:770:54
+    |
+768 |         self._conv_row.addStretch()
+769 |         for fmt in options:
+770 |             b = QPushButton(fmt); b.setStyleSheet(_B); b.clicked.connect(_h(fmt))
+    |                                                      ^
+771 |             self._conv_row.addWidget(b)
+772 |         cx = QPushButton("Γ£ò"); cx.setStyleSheet(_C); cx.setFixedWidth(28)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:772:30
+    |
+770 |             b = QPushButton(fmt); b.setStyleSheet(_B); b.clicked.connect(_h(fmt))
+771 |             self._conv_row.addWidget(b)
+772 |         cx = QPushButton("Γ£ò"); cx.setStyleSheet(_C); cx.setFixedWidth(28)
+    |                              ^
+773 |         cx.clicked.connect(self._conv_pill.hide); self._conv_row.addWidget(cx)
+774 |         self._conv_row.addStretch()
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:772:52
+    |
+770 |             b = QPushButton(fmt); b.setStyleSheet(_B); b.clicked.connect(_h(fmt))
+771 |             self._conv_row.addWidget(b)
+772 |         cx = QPushButton("Γ£ò"); cx.setStyleSheet(_C); cx.setFixedWidth(28)
+    |                                                    ^
+773 |         cx.clicked.connect(self._conv_pill.hide); self._conv_row.addWidget(cx)
+774 |         self._conv_row.addStretch()
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:773:49
+    |
+771 |             self._conv_row.addWidget(b)
+772 |         cx = QPushButton("Γ£ò"); cx.setStyleSheet(_C); cx.setFixedWidth(28)
+773 |         cx.clicked.connect(self._conv_pill.hide); self._conv_row.addWidget(cx)
+    |                                                 ^
+774 |         self._conv_row.addStretch()
+775 |         self._position_conv_pill()
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:802:46
+    |
+800 |             self._submit(intent)
+801 |
+802 |         b_merge = QPushButton("Merge to PDF"); b_merge.setStyleSheet(_B); b_merge.clicked.connect(_do_merge)
+    |                                              ^
+803 |         b_sep = QPushButton("Separate PDFs"); b_sep.setStyleSheet(_B); b_sep.clicked.connect(_do_separate)
+804 |         self._merge_row.addStretch()
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:802:73
+    |
+800 |             self._submit(intent)
+801 |
+802 |         b_merge = QPushButton("Merge to PDF"); b_merge.setStyleSheet(_B); b_merge.clicked.connect(_do_merge)
+    |                                                                         ^
+803 |         b_sep = QPushButton("Separate PDFs"); b_sep.setStyleSheet(_B); b_sep.clicked.connect(_do_separate)
+804 |         self._merge_row.addStretch()
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:803:45
+    |
+802 |         b_merge = QPushButton("Merge to PDF"); b_merge.setStyleSheet(_B); b_merge.clicked.connect(_do_merge)
+803 |         b_sep = QPushButton("Separate PDFs"); b_sep.setStyleSheet(_B); b_sep.clicked.connect(_do_separate)
+    |                                             ^
+804 |         self._merge_row.addStretch()
+805 |         self._merge_row.addWidget(b_merge)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:803:70
+    |
+802 |         b_merge = QPushButton("Merge to PDF"); b_merge.setStyleSheet(_B); b_merge.clicked.connect(_do_merge)
+803 |         b_sep = QPushButton("Separate PDFs"); b_sep.setStyleSheet(_B); b_sep.clicked.connect(_do_separate)
+    |                                                                      ^
+804 |         self._merge_row.addStretch()
+805 |         self._merge_row.addWidget(b_merge)
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:808:30
+    |
+806 |         self._merge_row.addWidget(b_sep)
+807 |
+808 |         cx = QPushButton("Γ£ò"); cx.setStyleSheet(_C); cx.setFixedWidth(28)
+    |                              ^
+809 |         cx.clicked.connect(self._merge_pill.hide); self._merge_row.addWidget(cx)
+810 |         self._merge_row.addStretch()
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:808:52
+    |
+806 |         self._merge_row.addWidget(b_sep)
+807 |
+808 |         cx = QPushButton("Γ£ò"); cx.setStyleSheet(_C); cx.setFixedWidth(28)
+    |                                                    ^
+809 |         cx.clicked.connect(self._merge_pill.hide); self._merge_row.addWidget(cx)
+810 |         self._merge_row.addStretch()
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:809:50
+    |
+808 |         cx = QPushButton("Γ£ò"); cx.setStyleSheet(_C); cx.setFixedWidth(28)
+809 |         cx.clicked.connect(self._merge_pill.hide); self._merge_row.addWidget(cx)
+    |                                                  ^
+810 |         self._merge_row.addStretch()
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:863:44
+    |
+861 |         # Cancel auto-dismiss timer when new work arrives
+862 |         if self._auto_dismiss_timer:
+863 |             self._auto_dismiss_timer.stop(); self._auto_dismiss_timer = None
+    |                                            ^
+864 |
+865 |         already_has_single = self._single_job_id is not None
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:886:51
+    |
+884 |         ):
+885 |             for item in list(self._batch_items.values()):
+886 |                 self._items_lay.removeWidget(item); item.deleteLater()
+    |                                                   ^
+887 |             self._batch_items.clear()
+888 |             already_has_batch = False
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:926:35
+    |
+924 |         self._s_center.setCurrentIndex(0)
+925 |         self._s_proc_label.setText("Optimising...")
+926 |         self._s_detail.setText(""); self._s_bar.setValue(0)
+    |                                   ^
+927 |         self._btn_undo.hide()
+928 |         self._btn_minus.hide()
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:955:37
+    |
+953 |     def _on_job_updated(self, job):
+954 |         if job.id == self._single_job_id:
+955 |             self._update_single(job); return
+    |                                     ^
+956 |         item = self._batch_items.get(job.id)
+957 |         if item: self._update_batch_item(item, job)
+    |
+
+E701 Multiple statements on one line (colon)
+   --> src\clyro\ui\dropzone.py:957:16
+    |
+955 |             self._update_single(job); return
+956 |         item = self._batch_items.get(job.id)
+957 |         if item: self._update_batch_item(item, job)
+    |                ^
+958 |
+959 |     def _update_single(self, job):
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:967:38
+    |
+965 |             elif isinstance(job.progress, (int, float)):
+966 |                 pct = int(job.progress * 100)
+967 |             self._s_bar.setValue(pct); self._s_detail.setText(detail)
+    |                                      ^
+968 |             self._btn_undo.hide()
+969 |         elif job.status == "completed" and job.result:
+    |
+
+E702 Multiple statements on one line (semicolon)
+   --> src\clyro\ui\dropzone.py:973:44
+    |
+971 |             self._s_center.setCurrentIndex(1)
+972 |             self._single_result = job.result.output_path
+973 |             orig = job.result.original_size; opt = job.result.optimized_size
+    |                                            ^
+974 |             if orig > 0:
+975 |                 self._s_diff.setText(
+    |
+
+E701 Multiple statements on one line (colon)
+    --> src\clyro\ui\dropzone.py:1144:41
+     |
+1143 |     def _do_auto_copy(self, path: Path):
+1144 |         if not path or not path.exists(): return
+     |                                         ^
+1145 |         from PyQt6.QtWidgets import QApplication
+1146 |         from PyQt6.QtCore import QMimeData, QUrl
+     |
+
+E401 [*] Multiple imports on one line
+    --> src\clyro\ui\dropzone.py:1153:9
+     |
+1152 |     def _reveal_single(self):
+1153 |         import sys, subprocess
+     |         ^^^^^^^^^^^^^^^^^^^^^^
+1154 |         if self._single_result and self._single_result.exists():
+1155 |             if sys.platform == "win32":
+     |
+help: Split imports
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1188:44
+     |
+1186 |     def _reset_to_idle(self):
+1187 |         if self._auto_dismiss_timer:
+1188 |             self._auto_dismiss_timer.stop(); self._auto_dismiss_timer = None
+     |                                            ^
+1189 |         if self._single_job_id:
+1190 |             self.queue.cancel_job(self._single_job_id)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1191:35
+     |
+1189 |         if self._single_job_id:
+1190 |             self.queue.cancel_job(self._single_job_id)
+1191 |         self._single_job_id = None; self._single_result = None
+     |                                   ^
+1192 |         self._name_pill.hide(); self._conv_pill.hide(); self._merge_pill.hide(); self._s_actions.hide()
+1193 |         self._shell_stack.setCurrentIndex(0)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1192:31
+     |
+1190 |             self.queue.cancel_job(self._single_job_id)
+1191 |         self._single_job_id = None; self._single_result = None
+1192 |         self._name_pill.hide(); self._conv_pill.hide(); self._merge_pill.hide(); self._s_actions.hide()
+     |                               ^
+1193 |         self._shell_stack.setCurrentIndex(0)
+1194 |         self._idle_title.setText("Drop files"); self._idle_hint.setText("ΓîÑ Convert  ┬╖  Γçº Max")
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1192:55
+     |
+1190 |             self.queue.cancel_job(self._single_job_id)
+1191 |         self._single_job_id = None; self._single_result = None
+1192 |         self._name_pill.hide(); self._conv_pill.hide(); self._merge_pill.hide(); self._s_actions.hide()
+     |                                                       ^
+1193 |         self._shell_stack.setCurrentIndex(0)
+1194 |         self._idle_title.setText("Drop files"); self._idle_hint.setText("ΓîÑ Convert  ┬╖  Γçº Max")
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1192:80
+     |
+1190 |             self.queue.cancel_job(self._single_job_id)
+1191 |         self._single_job_id = None; self._single_result = None
+1192 |         self._name_pill.hide(); self._conv_pill.hide(); self._merge_pill.hide(); self._s_actions.hide()
+     |                                                                                ^
+1193 |         self._shell_stack.setCurrentIndex(0)
+1194 |         self._idle_title.setText("Drop files"); self._idle_hint.setText("ΓîÑ Convert  ┬╖  Γçº Max")
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1194:47
+     |
+1192 |         self._name_pill.hide(); self._conv_pill.hide(); self._merge_pill.hide(); self._s_actions.hide()
+1193 |         self._shell_stack.setCurrentIndex(0)
+1194 |         self._idle_title.setText("Drop files"); self._idle_hint.setText("ΓîÑ Convert  ┬╖  Γçº Max")
+     |                                               ^
+1195 |         self._apply_size(mode="idle")
+     |
+
+E701 Multiple statements on one line (colon)
+    --> src\clyro\ui\dropzone.py:1200:16
+     |
+1198 |         self.queue.cancel_job(job_id)
+1199 |         item = self._batch_items.pop(job_id, None)
+1200 |         if item: self._items_lay.removeWidget(item); item.deleteLater()
+     |                ^
+1201 |         if not self._batch_items: self._clear_all()
+1202 |         else: self._apply_size(mode="batch", card_count=len(self._batch_items))
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1200:52
+     |
+1198 |         self.queue.cancel_job(job_id)
+1199 |         item = self._batch_items.pop(job_id, None)
+1200 |         if item: self._items_lay.removeWidget(item); item.deleteLater()
+     |                                                    ^
+1201 |         if not self._batch_items: self._clear_all()
+1202 |         else: self._apply_size(mode="batch", card_count=len(self._batch_items))
+     |
+
+E701 Multiple statements on one line (colon)
+    --> src\clyro\ui\dropzone.py:1201:33
+     |
+1199 |         item = self._batch_items.pop(job_id, None)
+1200 |         if item: self._items_lay.removeWidget(item); item.deleteLater()
+1201 |         if not self._batch_items: self._clear_all()
+     |                                 ^
+1202 |         else: self._apply_size(mode="batch", card_count=len(self._batch_items))
+     |
+
+E701 Multiple statements on one line (colon)
+    --> src\clyro\ui\dropzone.py:1202:13
+     |
+1200 |         if item: self._items_lay.removeWidget(item); item.deleteLater()
+1201 |         if not self._batch_items: self._clear_all()
+1202 |         else: self._apply_size(mode="batch", card_count=len(self._batch_items))
+     |             ^
+1203 |
+1204 |     def _clear_all(self):
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1206:47
+     |
+1204 |     def _clear_all(self):
+1205 |         for item in list(self._batch_items.values()):
+1206 |             self._items_lay.removeWidget(item); item.deleteLater()
+     |                                               ^
+1207 |         self._batch_items.clear(); 
+1208 |         self.queue.clear_history() 
+     |
+
+E703 [*] Statement ends with an unnecessary semicolon
+    --> src\clyro\ui\dropzone.py:1207:34
+     |
+1205 |         for item in list(self._batch_items.values()):
+1206 |             self._items_lay.removeWidget(item); item.deleteLater()
+1207 |         self._batch_items.clear(); 
+     |                                  ^
+1208 |         self.queue.clear_history() 
+1209 |         self._reset_to_idle()
+     |
+help: Remove unnecessary semicolon
+
+E701 Multiple statements on one line (colon)
+    --> src\clyro\ui\dropzone.py:1219:20
+     |
+1217 |                 urls.append(QUrl.fromLocalFile(str(item.output_path)))
+1218 |         
+1219 |         if not urls: return
+     |                    ^
+1220 |         
+1221 |         from PyQt6.QtWidgets import QApplication
+     |
+
+E701 Multiple statements on one line (colon)
+    --> src\clyro\ui\dropzone.py:1253:21
+     |
+1251 |         """FloatingResult 'Save to folder' pattern for batch items."""
+1252 |         paths = [item.output_path for item in self._batch_items.values() if item.output_path and item.output_path.exists()]
+1253 |         if not paths: return
+     |                     ^
+1254 |
+1255 |         from PyQt6.QtWidgets import QFileDialog
+     |
+
+E401 [*] Multiple imports on one line
+    --> src\clyro\ui\dropzone.py:1256:9
+     |
+1255 |         from PyQt6.QtWidgets import QFileDialog
+1256 |         import shutil, sys, os, subprocess
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1257 |
+1258 |         dest_dir = QFileDialog.getExistingDirectory(self, "Select Destination Folder")
+     |
+help: Split imports
+
+E701 Multiple statements on one line (colon)
+    --> src\clyro\ui\dropzone.py:1259:24
+     |
+1258 |         dest_dir = QFileDialog.getExistingDirectory(self, "Select Destination Folder")
+1259 |         if not dest_dir: return
+     |                        ^
+1260 |         dest_path = Path(dest_dir)
+     |
+
+E401 [*] Multiple imports on one line
+    --> src\clyro\ui\dropzone.py:1313:21
+     |
+1311 |             if self._shell_stack.currentIndex() == 1 and self._s_center.currentIndex() == 1:
+1312 |                 if self._single_result and self._single_result.exists():
+1313 |                     import os, sys, subprocess
+     |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+1314 |                     if sys.platform == "win32":
+1315 |                         os.startfile(self._single_result)
+     |
+help: Split imports
+
+E701 Multiple statements on one line (colon)
+    --> src\clyro\ui\dropzone.py:1338:61
+     |
+1336 |     def mouseMoveEvent(self, e):
+1337 |         if getattr(self, '_file_drag_start_pos', None):
+1338 |             if not (e.buttons() & Qt.MouseButton.LeftButton): return
+     |                                                             ^
+1339 |             from PyQt6.QtWidgets import QApplication
+1340 |             from PyQt6.QtGui import QDrag
+     |
+
+E701 Multiple statements on one line (colon)
+    --> src\clyro\ui\dropzone.py:1342:106
+     |
+1340 |             from PyQt6.QtGui import QDrag
+1341 |             from PyQt6.QtCore import QMimeData, QUrl
+1342 |             if (e.pos() - self._file_drag_start_pos).manhattanLength() < QApplication.startDragDistance(): return
+     |                                                                                                          ^
+1343 |             drag = QDrag(self)
+1344 |             mime = QMimeData()
+     |
+
+E402 Module level import not at top of file
+    --> src\clyro\ui\dropzone.py:1396:1
+     |
+1394 | # ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+1395 |
+1396 | from PyQt6.QtCore import pyqtSignal as _sig
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1397 |
+1398 | class BatchItem(QWidget):
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1451:40
+     |
+1450 |         lay = QVBoxLayout(self)
+1451 |         lay.setContentsMargins(0,0,0,0); lay.setSpacing(0)
+     |                                        ^
+1452 |
+1453 |         # ΓöÇΓöÇ Name pill ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1454:24
+     |
+1453 | ΓÇª     # ΓöÇΓöÇ Name pill ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+1454 | ΓÇª     pill = QFrame(); pill.setObjectName("pill")
+     |                      ^
+1455 | ΓÇª     pill.setStyleSheet(self._PILL_STYLE); pill.setFixedHeight(30)
+1456 | ΓÇª     pr = QHBoxLayout(pill); pr.setContentsMargins(10,0,10,0); pr.setSpacing(6)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1455:45
+     |
+1453 | ΓÇª     # ΓöÇΓöÇ Name pill ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+1454 | ΓÇª     pill = QFrame(); pill.setObjectName("pill")
+1455 | ΓÇª     pill.setStyleSheet(self._PILL_STYLE); pill.setFixedHeight(30)
+     |                                           ^
+1456 | ΓÇª     pr = QHBoxLayout(pill); pr.setContentsMargins(10,0,10,0); pr.setSpacing(6)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1456:31
+     |
+1454 |         pill = QFrame(); pill.setObjectName("pill")
+1455 |         pill.setStyleSheet(self._PILL_STYLE); pill.setFixedHeight(30)
+1456 |         pr = QHBoxLayout(pill); pr.setContentsMargins(10,0,10,0); pr.setSpacing(6)
+     |                               ^
+1457 |
+1458 |         stem = Path(filename).stem; ext = Path(filename).suffix
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1456:65
+     |
+1454 |         pill = QFrame(); pill.setObjectName("pill")
+1455 |         pill.setStyleSheet(self._PILL_STYLE); pill.setFixedHeight(30)
+1456 |         pr = QHBoxLayout(pill); pr.setContentsMargins(10,0,10,0); pr.setSpacing(6)
+     |                                                                 ^
+1457 |
+1458 |         stem = Path(filename).stem; ext = Path(filename).suffix
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1458:35
+     |
+1456 |         pr = QHBoxLayout(pill); pr.setContentsMargins(10,0,10,0); pr.setSpacing(6)
+1457 |
+1458 |         stem = Path(filename).stem; ext = Path(filename).suffix
+     |                                   ^
+1459 |         if len(stem) > 16: stem = stem[:10] + "ΓÇª" + stem[-4:]
+1460 |         self._name_lbl = QLabel(stem)
+     |
+
+E701 Multiple statements on one line (colon)
+    --> src\clyro\ui\dropzone.py:1459:26
+     |
+1458 |         stem = Path(filename).stem; ext = Path(filename).suffix
+1459 |         if len(stem) > 16: stem = stem[:10] + "ΓÇª" + stem[-4:]
+     |                          ^
+1460 |         self._name_lbl = QLabel(stem)
+1461 |         self._name_lbl.setMinimumWidth(10)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1466:37
+     |
+1464 |         self._ext_lbl.setStyleSheet("font-size:11px;font-weight:600;color:rgba(255,255,255,0.30);"
+1465 |                                "background:transparent;")
+1466 |         pr.addWidget(self._name_lbl); pr.addStretch(); pr.addWidget(self._ext_lbl)
+     |                                     ^
+1467 |         lay.addWidget(pill)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1466:54
+     |
+1464 |         self._ext_lbl.setStyleSheet("font-size:11px;font-weight:600;color:rgba(255,255,255,0.30);"
+1465 |                                "background:transparent;")
+1466 |         pr.addWidget(self._name_lbl); pr.addStretch(); pr.addWidget(self._ext_lbl)
+     |                                                      ^
+1467 |         lay.addWidget(pill)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1470:30
+     |
+1469 | ΓÇª     # ΓöÇΓöÇ Card body ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+1470 | ΓÇª     self._body = QFrame(); self._body.setObjectName("body")
+     |                            ^
+1471 | ΓÇª     self._body.setStyleSheet(self._BODY_STYLE); self._body.setFixedHeight(48)
+1472 | ΓÇª     bl = QVBoxLayout(self._body); bl.setContentsMargins(10,8,8,8); bl.setSpacing(4)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1471:51
+     |
+1469 | ΓÇª     # ΓöÇΓöÇ Card body ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+1470 | ΓÇª     self._body = QFrame(); self._body.setObjectName("body")
+1471 | ΓÇª     self._body.setStyleSheet(self._BODY_STYLE); self._body.setFixedHeight(48)
+     |                                                 ^
+1472 | ΓÇª     bl = QVBoxLayout(self._body); bl.setContentsMargins(10,8,8,8); bl.setSpacing(4)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1472:37
+     |
+1470 |         self._body = QFrame(); self._body.setObjectName("body")
+1471 |         self._body.setStyleSheet(self._BODY_STYLE); self._body.setFixedHeight(48)
+1472 |         bl = QVBoxLayout(self._body); bl.setContentsMargins(10,8,8,8); bl.setSpacing(4)
+     |                                     ^
+1473 |
+1474 |         row = QHBoxLayout(); row.setContentsMargins(0,0,0,0); row.setSpacing(6)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1472:70
+     |
+1470 |         self._body = QFrame(); self._body.setObjectName("body")
+1471 |         self._body.setStyleSheet(self._BODY_STYLE); self._body.setFixedHeight(48)
+1472 |         bl = QVBoxLayout(self._body); bl.setContentsMargins(10,8,8,8); bl.setSpacing(4)
+     |                                                                      ^
+1473 |
+1474 |         row = QHBoxLayout(); row.setContentsMargins(0,0,0,0); row.setSpacing(6)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1474:28
+     |
+1472 |         bl = QVBoxLayout(self._body); bl.setContentsMargins(10,8,8,8); bl.setSpacing(4)
+1473 |
+1474 |         row = QHBoxLayout(); row.setContentsMargins(0,0,0,0); row.setSpacing(6)
+     |                            ^
+1475 |         self._status = QLabel("Queued")
+1476 |         self._status.setMinimumWidth(10)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1474:61
+     |
+1472 |         bl = QVBoxLayout(self._body); bl.setContentsMargins(10,8,8,8); bl.setSpacing(4)
+1473 |
+1474 |         row = QHBoxLayout(); row.setContentsMargins(0,0,0,0); row.setSpacing(6)
+     |                                                             ^
+1475 |         self._status = QLabel("Queued")
+1476 |         self._status.setMinimumWidth(10)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1481:41
+     |
+1479 |         dismiss.setIcon(_icon("x-bold.svg"))
+1480 |         dismiss.setIconSize(QSize(10, 10))
+1481 |         dismiss.setStyleSheet(self._BTN); dismiss.setFixedSize(20,20)
+     |                                         ^
+1482 |         dismiss.clicked.connect(lambda: self.dismiss_requested.emit(self.job_id))
+1483 |         row.addWidget(self._status,1); row.addWidget(dismiss)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1483:38
+     |
+1481 |         dismiss.setStyleSheet(self._BTN); dismiss.setFixedSize(20,20)
+1482 |         dismiss.clicked.connect(lambda: self.dismiss_requested.emit(self.job_id))
+1483 |         row.addWidget(self._status,1); row.addWidget(dismiss)
+     |                                      ^
+1484 |         bl.addLayout(row)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1487:34
+     |
+1486 |         self._bar = QProgressBar()
+1487 |         self._bar.setRange(0,100); self._bar.setValue(0)
+     |                                  ^
+1488 |         self._bar.setFixedHeight(2); self._bar.setTextVisible(False)
+1489 |         self._bar.setStyleSheet(self._BAR_STYLE); self._bar.hide()
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1488:36
+     |
+1486 |         self._bar = QProgressBar()
+1487 |         self._bar.setRange(0,100); self._bar.setValue(0)
+1488 |         self._bar.setFixedHeight(2); self._bar.setTextVisible(False)
+     |                                    ^
+1489 |         self._bar.setStyleSheet(self._BAR_STYLE); self._bar.hide()
+1490 |         bl.addWidget(self._bar)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1489:49
+     |
+1487 |         self._bar.setRange(0,100); self._bar.setValue(0)
+1488 |         self._bar.setFixedHeight(2); self._bar.setTextVisible(False)
+1489 |         self._bar.setStyleSheet(self._BAR_STYLE); self._bar.hide()
+     |                                                 ^
+1490 |         bl.addWidget(self._bar)
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1508:32
+     |
+1506 |         self._name_lbl.setStyleSheet("font-size:11px;font-weight:700;color:rgba(255,255,255,0.60);background:transparent;")
+1507 |         self._ext_lbl.setStyleSheet("font-size:11px;font-weight:600;color:rgba(255,255,255,0.50);background:transparent;")
+1508 |         self._bar.setValue(pct); self._bar.show()
+     |                                ^
+1509 |         if detail:
+1510 |             # downloading messages might be long
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1521:31
+     |
+1519 |         self._name_lbl.setStyleSheet("font-size:11px;font-weight:700;color:rgba(255,255,255,0.95);background:transparent;")
+1520 |         self._ext_lbl.setStyleSheet("font-size:11px;font-weight:600;color:rgba(255,255,255,0.85);background:transparent;")
+1521 |         self.output_path = out; self._bar.hide()
+     |                               ^
+1522 |         if orig > 0 and orig != final:
+1523 |             txt = (f"<span style='color:#FF5252;'>{_fmt(orig)}</span>"
+     |
+
+E702 Multiple statements on one line (semicolon)
+    --> src\clyro\ui\dropzone.py:1528:34
+     |
+1526 |         else:
+1527 |             txt = f"<span style='color:#FFD54F;'>{_fmt(final)}</span>"
+1528 |         self._status.setText(txt); self._status.setStyleSheet("font-family: 'Space Mono', monospace; font-size:11px;")
+     |                                  ^
+1529 |         self._body.setStyleSheet(self._BODY_DONE_STYLE)
+     |
+
+E401 [*] Multiple imports on one line
+    --> src\clyro\ui\dropzone.py:1543:13
+     |
+1541 |         """Double-click to open result."""
+1542 |         if event.button() == Qt.MouseButton.LeftButton and self.output_path and self.output_path.exists():
+1543 |             import os, sys, subprocess
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+1544 |             if sys.platform == "win32":
+1545 |                 os.startfile(self.output_path)
+     |
+help: Split imports
+
+E701 Multiple statements on one line (colon)
+    --> src\clyro\ui\dropzone.py:1594:61
+     |
+1592 |             return
+1593 |             
+1594 |         if not (event.buttons() & Qt.MouseButton.LeftButton): return
+     |                                                             ^
+1595 |             
+1596 |         from PyQt6.QtWidgets import QApplication
+     |
+
+F401 [*] `os` imported but unused
+ --> src\clyro\ui\result_card.py:1:8
+  |
+1 | import os
+  |        ^^
+2 | import subprocess
+3 | import sys
+  |
+help: Remove unused import: `os`
+
+F401 [*] `PyQt6.QtCore.QSize` imported but unused
+  --> src\clyro\ui\result_card.py:9:42
+   |
+ 7 |     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QProgressBar, QFrame, QApplication
+ 8 | )
+ 9 | from PyQt6.QtCore import Qt, pyqtSignal, QSize, QMimeData, QUrl, QTimer
+   |                                          ^^^^^
+10 | from PyQt6.QtGui import QIcon, QDrag, QMouseEvent
+11 | import logging
+   |
+help: Remove unused import: `PyQt6.QtCore.QSize`
+
+F401 [*] `PyQt6.QtGui.QAction` imported but unused
+   --> src\clyro\ui\result_card.py:223:33
+    |
+222 |         from PyQt6.QtWidgets import QMenu
+223 |         from PyQt6.QtGui import QAction
+    |                                 ^^^^^^^
+224 |         
+225 |         menu = QMenu(self)
+    |
+help: Remove unused import: `PyQt6.QtGui.QAction`
+
+F401 [*] `PyQt6.QtCore.Qt` imported but unused
+ --> src\clyro\ui\settings_pages\about.py:6:26
+  |
+4 |     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
+5 | )
+6 | from PyQt6.QtCore import Qt
+  |                          ^^
+7 |
+8 | try:
+  |
+help: Remove unused import: `PyQt6.QtCore.Qt`
+
+F401 [*] `PyQt6.QtWidgets.QLineEdit` imported but unused
+ --> src\clyro\ui\settings_pages\dropzone_shortcuts.py:2:67
+  |
+1 | from PyQt6.QtWidgets import (
+2 |     QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QFrame, QLineEdit
+  |                                                                   ^^^^^^^^^
+3 | )
+4 | from PyQt6.QtCore import Qt
+  |
+help: Remove unused import: `PyQt6.QtWidgets.QLineEdit`
+
+F401 [*] `PyQt6.QtCore.Qt` imported but unused
+ --> src\clyro\ui\settings_pages\dropzone_shortcuts.py:4:26
+  |
+2 |     QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QFrame, QLineEdit
+3 | )
+4 | from PyQt6.QtCore import Qt
+  |                          ^^
+5 |
+6 | LABEL_STYLE = "font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.45); letter-spacing: 0.8px;"
+  |
+help: Remove unused import: `PyQt6.QtCore.Qt`
+
+F401 [*] `pathlib.Path` imported but unused
+ --> src\clyro\ui\settings_pages\general.py:1:21
+  |
+1 | from pathlib import Path
+  |                     ^^^^
+2 | from PyQt6.QtWidgets import (
+3 |     QWidget, QVBoxLayout, QHBoxLayout, QRadioButton, QButtonGroup,
+  |
+help: Remove unused import: `pathlib.Path`
+
+F401 [*] `PyQt6.QtGui.QFont` imported but unused
+  --> src\clyro\ui\settings_pages\general.py:8:25
+   |
+ 6 | )
+ 7 | from PyQt6.QtCore import Qt
+ 8 | from PyQt6.QtGui import QFont
+   |                         ^^^^^
+ 9 |
+10 | LABEL_STYLE = "font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.45); letter-spacing: 0.8px;"
+   |
+help: Remove unused import: `PyQt6.QtGui.QFont`
+
+F811 [*] Redefinition of unused `Path` from line 1
+   --> src\clyro\ui\settings_pages\general.py:316:29
+    |
+315 |     def _browse_web_folder(self):
+316 |         from pathlib import Path
+    |                             ^^^^ `Path` redefined here
+317 |         default_dir = self.web_folder_edit.text() or str(Path.home() / "Downloads")
+318 |         path = QFileDialog.getExistingDirectory(self, "Select Web Download Folder", default_dir)
+    |
+   ::: src\clyro\ui\settings_pages\general.py:1:21
+    |
+  1 | from pathlib import Path
+    |                     ---- previous definition of `Path` here
+  2 | from PyQt6.QtWidgets import (
+  3 |     QWidget, QVBoxLayout, QHBoxLayout, QRadioButton, QButtonGroup,
+    |
+help: Remove definition: `Path`
+
+E701 Multiple statements on one line (colon)
+   --> src\clyro\ui\settings_pages\quality.py:318:28
+    |
+316 |         self.chk_no_audio.setChecked(p.get("video_remove_audio", False))
+317 |         pdf = p.get("pdf_compression", "recommended")
+318 |         if pdf == "extreme": self.rb_pdf_ext.setChecked(True)
+    |                            ^
+319 |         else: self.rb_pdf_rec.setChecked(True)
+    |
+
+E701 Multiple statements on one line (colon)
+   --> src\clyro\ui\settings_pages\quality.py:319:13
+    |
+317 |         pdf = p.get("pdf_compression", "recommended")
+318 |         if pdf == "extreme": self.rb_pdf_ext.setChecked(True)
+319 |         else: self.rb_pdf_rec.setChecked(True)
+    |             ^
+320 |
+321 |         # Update button states
+    |
+
+E701 Multiple statements on one line (colon)
+   --> src\clyro\ui\settings_pages\quality.py:356:28
+    |
+355 |         pdf = self.settings.pdf_compression
+356 |         if pdf == "extreme": self.rb_pdf_ext.setChecked(True)
+    |                            ^
+357 |         else: self.rb_pdf_rec.setChecked(True)
+    |
+
+E701 Multiple statements on one line (colon)
+   --> src\clyro\ui\settings_pages\quality.py:357:13
+    |
+355 |         pdf = self.settings.pdf_compression
+356 |         if pdf == "extreme": self.rb_pdf_ext.setChecked(True)
+357 |         else: self.rb_pdf_rec.setChecked(True)
+    |             ^
+358 |
+359 |         sort_order = getattr(self.settings, 'pdf_merge_sort_order', 'none')
+    |
+
+F401 [*] `PyQt6.QtCore.QSize` imported but unused
+ --> src\clyro\ui\settings_window.py:5:42
+  |
+3 |     QWidget, QStackedWidget, QScrollArea, QFrame
+4 | )
+5 | from PyQt6.QtCore import Qt, pyqtSignal, QSize
+  |                                          ^^^^^
+6 | from PyQt6.QtGui import QIcon, QFont
+  |
+help: Remove unused import: `PyQt6.QtCore.QSize`
+
+F401 [*] `PyQt6.QtGui.QIcon` imported but unused
+ --> src\clyro\ui\settings_window.py:6:25
+  |
+4 | )
+5 | from PyQt6.QtCore import Qt, pyqtSignal, QSize
+6 | from PyQt6.QtGui import QIcon, QFont
+  |                         ^^^^^
+7 |
+8 | from clyro.ui.settings_pages.general import GeneralPage
+  |
+help: Remove unused import
+
+F401 [*] `PyQt6.QtGui.QFont` imported but unused
+ --> src\clyro\ui\settings_window.py:6:32
+  |
+4 | )
+5 | from PyQt6.QtCore import Qt, pyqtSignal, QSize
+6 | from PyQt6.QtGui import QIcon, QFont
+  |                                ^^^^^
+7 |
+8 | from clyro.ui.settings_pages.general import GeneralPage
+  |
+help: Remove unused import
+
+F401 [*] `asyncio` imported but unused
+ --> src\clyro\updater.py:7:8
+  |
+5 | import tempfile
+6 | import aiohttp
+7 | import asyncio
+  |        ^^^^^^^
+8 | import logging
+  |
+help: Remove unused import: `asyncio`
+
+Found 190 errors.
+[*] 37 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
