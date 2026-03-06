@@ -3,7 +3,7 @@
 ; Users just double-click and use — no extra installs needed.
 
 #define MyAppName      "Clyro"
-#define MyAppVersion   "0.1.1"
+#define MyAppVersion   "0.1.2"
 #define MyAppPublisher "Clyro"
 #define MyAppExeName   "Clyro.exe"
 #define MyAppDir       "dist\Clyro"

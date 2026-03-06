@@ -17,6 +17,7 @@ dependencies = [
   "pdf2docx",
   "typer>=0.12",
   "aiohttp>=3.9",
+  "mozjpeg-lossless-optimization",
 ]
 
 [project.scripts]
