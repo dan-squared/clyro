@@ -1,23 +1,26 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
+project_root = os.path.abspath(os.path.dirname(os.getcwd()))
+# If running from project root, os.getcwd() is the project root.
+# build_release.py runs PyInstaller from PROJECT_ROOT.
+project_root = os.getcwd()
 
 a = Analysis(
-    ['src\\clyro\\main.py'],
+    ['src/clyro/main.py'],
     pathex=[],
     binaries=[
-        # Root bin: ffmpeg, ffprobe, gswin64c, gsdll64, pngquant
-        ('C:\\Users\\hp\\Downloads\\Projects\\Clyro\\bin\\ffmpeg.exe',   'bin'),
-        ('C:\\Users\\hp\\Downloads\\Projects\\Clyro\\bin\\ffprobe.exe',  'bin'),
-        ('C:\\Users\\hp\\Downloads\\Projects\\Clyro\\bin\\gswin64c.exe', 'bin'),
-        ('C:\\Users\\hp\\Downloads\\Projects\\Clyro\\bin\\gsdll64.dll',  'bin'),
-        ('C:\\Users\\hp\\Downloads\\Projects\\Clyro\\bin\\pngquant.exe', 'bin'),
-        ('C:\\Users\\hp\\Downloads\\Projects\\Clyro\\bin\\gifsicle.exe', 'bin'),
-        ('C:\\Users\\hp\\Downloads\\Projects\\Clyro\\bin\\jpegoptim.exe', 'bin'),
-        # Ghostscript runtime resources (must be addressable via GS_LIB)
-        ('C:\\Users\\hp\\Downloads\\Projects\\Clyro\\bin\\gs_lib',      'bin\\gs_lib'),
-        ('C:\\Users\\hp\\Downloads\\Projects\\Clyro\\bin\\gs_resource',  'bin\\gs_resource'),
+        (os.path.join(project_root, 'bin', 'ffmpeg.exe'),   'bin'),
+        (os.path.join(project_root, 'bin', 'ffprobe.exe'),  'bin'),
+        (os.path.join(project_root, 'bin', 'gswin64c.exe'), 'bin'),
+        (os.path.join(project_root, 'bin', 'gsdll64.dll'),  'bin'),
+        (os.path.join(project_root, 'bin', 'pngquant.exe'), 'bin'),
+        (os.path.join(project_root, 'bin', 'gifsicle.exe'), 'bin'),
+        (os.path.join(project_root, 'bin', 'jpegoptim.exe'), 'bin'),
+        (os.path.join(project_root, 'bin', 'gs_lib'),      'bin/gs_lib'),
+        (os.path.join(project_root, 'bin', 'gs_resource'),  'bin/gs_resource'),
     ],
-    datas=[('C:\\Users\\hp\\Downloads\\Projects\\Clyro\\src\\clyro\\assets', 'clyro/assets')],
+    datas=[(os.path.join(project_root, 'src/clyro/assets'), 'clyro/assets')],
     hiddenimports=['mozjpeg_lossless_optimization', 'cffi', 'pycparser', 'pdf2docx', 'pdf2docx.converter', 'docx', 'fitz'],
     hookspath=[],
     hooksconfig={},
@@ -38,7 +41,7 @@ a = Analysis(
         'turtle', 'curses', 'readline',
     ],
     noarchive=False,
-    optimize=2,   # strip docstrings + asserts → smaller .pyc, faster imports
+    optimize=2,
 )
 pyz = PYZ(a.pure)
 
@@ -59,7 +62,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\Users\\hp\\Downloads\\Projects\\Clyro\\src\\clyro\\assets\\icons\\app\\256.ico'],
+    icon=[os.path.join(project_root, 'src/clyro/assets/icons/app/256.ico')],
 )
 coll = COLLECT(
     exe,
@@ -70,3 +73,4 @@ coll = COLLECT(
     upx_exclude=['vcruntime140.dll', 'python3*.dll', 'Qt6*.dll', 'gsdll64.dll'],
     name='Clyro',
 )
+

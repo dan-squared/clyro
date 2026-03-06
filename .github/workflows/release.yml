@@ -27,6 +27,9 @@ jobs:
         pip install -r requirements.txt
         pip install -e .
         
+    - name: Install Ghostscript
+      run: choco install ghostscript --yes --no-progress
+      
     - name: Copy target binaries (if any stored remotely)
       run: |
         mkdir -p bin
@@ -40,7 +43,7 @@ jobs:
     - name: Compile Inno Setup Installer
       uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
       with:
-        path: clyro.iss
+        path: installer.iss
         
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
