@@ -80,8 +80,16 @@ class DownloadWorker(QThread):
                         if not chunk:
                             break
                             
-                        f.write(chunk)
                         downloaded += len(chunk)
+                        if downloaded > max_size:
+                            temp_path.unlink(missing_ok=True)
+                            self.download_failed.emit(
+                                f"File stream exceeded maximum size of {max_size // (1024*1024)} MB",
+                                self.url
+                            )
+                            return
+                            
+                        f.write(chunk)
                         
                         if total_size > 0:
                             pct = int((downloaded / total_size) * 100)

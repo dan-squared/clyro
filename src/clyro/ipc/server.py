@@ -1,4 +1,3 @@
-from aiohttp import web
 import asyncio
 from threading import Thread
 import logging
@@ -21,6 +20,8 @@ class IpcServer:
         self.thread.start()
         
     def _run_server(self, port):
+        from aiohttp import web
+        self._web = web  # store for handler methods
         asyncio.set_event_loop(self.loop)
         app = web.Application()
         app.router.add_post('/optimize', self.handle_optimize)
@@ -50,7 +51,7 @@ class IpcServer:
                 Qt.ConnectionType.QueuedConnection,
                 Q_ARG(object, intent)
             )
-        return web.json_response({"status": "queued", "count": len(paths)})
+        return self._web.json_response({"status": "queued", "count": len(paths)})
         
     async def handle_convert(self, request):
         data = await request.json()
@@ -64,7 +65,7 @@ class IpcServer:
                 Qt.ConnectionType.QueuedConnection,
                 Q_ARG(object, intent)
             )
-        return web.json_response({"status": "queued", "count": len(paths)})
+        return self._web.json_response({"status": "queued", "count": len(paths)})
         
     async def handle_show(self, request):
         # show() is also a UI call — dispatch to main thread
@@ -72,7 +73,7 @@ class IpcServer:
             self.dropzone, "show",
             Qt.ConnectionType.QueuedConnection
         )
-        return web.json_response({"status": "shown"})
+        return self._web.json_response({"status": "shown"})
 
     def stop(self):
         if self.loop and self.loop.is_running():

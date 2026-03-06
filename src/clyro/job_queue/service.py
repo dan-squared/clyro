@@ -52,13 +52,20 @@ class QueueService(QObject):
         # Auto-evict oldest completed/failed jobs when approaching the limit
         if len(self.jobs) >= self.max_history:
             evict_count = max(1, self.max_history // 10)  # evict 10% at a time
-            evictable = [
-                jid for jid in self.history
-                if self.jobs.get(jid) and self.jobs[jid].status in ("completed", "failed")
-            ]
-            for jid in evictable[:evict_count]:
+            evictable_set = set()
+            for jid in self.history:
+                if self.jobs.get(jid) and self.jobs[jid].status in ("completed", "failed"):
+                    evictable_set.add(jid)
+                    if len(evictable_set) >= evict_count:
+                        break
+            
+            for jid in evictable_set:
                 self.jobs.pop(jid, None)
-                self.history.remove(jid)
+            
+            # Rebuild history without the evicted jobs
+            if evictable_set:
+                self.history = [j for j in self.history if j not in evictable_set]
+            
             # If still full (all jobs active), raise
             if len(self.jobs) >= self.max_history:
                 raise QueueFullError("Too many active jobs in history. Please wait or clear them.")
@@ -110,9 +117,6 @@ class QueueService(QObject):
                 except Exception:
                     pass
 
-        # Defer gc to avoid stalling the main thread mid-signal-callback
-        QTimer.singleShot(500, lambda: gc.collect(0))
-
     def _on_job_failed(self, job_id: str, message: str, detail: str):
         if job := self.jobs.get(job_id):
             job.status = "failed"
@@ -120,7 +124,6 @@ class QueueService(QObject):
             job.error_detail = detail
             logger.error(f"Job failed: {job_id} - {message} ({detail})")
             self.job_updated.emit(job)
-        QTimer.singleShot(500, lambda: gc.collect(0))
             
     def get_job(self, job_id: str) -> Job | None:
         return self.jobs.get(job_id)

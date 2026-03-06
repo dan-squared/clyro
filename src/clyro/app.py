@@ -1,29 +1,23 @@
 import sys
 import logging
-import winreg
 import atexit
 import os
 import glob
 import time
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import QTimer
 
+# Lightweight config — no heavy deps
 from clyro.config.store import SettingsStore
-from clyro.core.tools import discover_tools
-from clyro.core.dispatcher import CommandDispatcher
-from clyro.core.optimize import OptimizeDispatcher
-from clyro.core.convert import ConvertDispatcher
-from clyro.core.image import ImageHandler, ImageToImageHandler, ImageToPdfHandler
-from clyro.core.video import VideoHandler, VideoToVideoHandler, VideoToImageHandler
-from clyro.core.pdf import PdfHandler, PdfToImageHandler, PdfToWordHandler
-from clyro.job_queue.service import QueueService
 from clyro.ui.dropzone import DropzoneWindow
-from clyro.ui.settings_window import SettingsWindow
 from clyro.ui.tray import TrayIcon
 from clyro.ui.theme import Theme
-from clyro.ipc.server import IpcServer
-from clyro.updater import AutoUpdater
-import asyncio
+
+# Heavy modules imported lazily inside methods:
+#   clyro.core.tools, clyro.core.dispatcher, clyro.core.optimize,
+#   clyro.core.convert, clyro.core.image, clyro.core.video,
+#   clyro.core.pdf, clyro.ipc.server, clyro.updater, winreg
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +26,20 @@ class AppManager:
         self.app = app
         app.setStyleSheet(Theme.STYLE_SHEET)
         
-        # Core initialization
+        # ── Phase 1: Instant — load config + show window ──────────────
         self.store = SettingsStore()
         self.settings = self.store.load()
-        self.tools = discover_tools()
         
-        self.cmd_dispatch = CommandDispatcher(self.settings, self.tools, None, None)
-        self.queue_service = QueueService(self.cmd_dispatch)
-        self._build_handlers()
+        # Lightweight placeholders (no heavy core imports yet)
+        self.tools = None
+        self.cmd_dispatch = None
+        self.queue_service = None
+        self._handlers_ready = False
+        self.ipc = None
+        self.settings_window = None
         
-        # UI
-        self.dropzone = DropzoneWindow(self.queue_service, self.settings)
+        # Build & show UI immediately (uses only PyQt6 — no heavy deps)
+        self.dropzone = DropzoneWindow(None, self.settings)  # queue_service=None for now
         
         # Position at bottom right
         screen_geom = self.app.primaryScreen().availableGeometry()
@@ -50,41 +47,74 @@ class AppManager:
         y = screen_geom.height() - self.dropzone.height() - 40
         self.dropzone.move(x, y)
         
-        # Use the pre-built icon passed from main (avoids reading the file twice)
+        # Tray icon (lightweight)
         app_icon = icon or QIcon()
         self.tray = TrayIcon(self, app_icon)
-        
         if self.settings.show_tray:
             self.tray.show()
             
-        # Start hidden by default; user summons it via tray or global shortcut
+        # Show the window NOW — user sees it in <500ms
         self.dropzone.show()
         
-        # Start updater asynchronously
-        self._check_for_updates()
+        # ── Phase 2: Deferred — heavy init after event loop starts ────
+        # QTimer.singleShot(0) runs immediately after the event loop
+        # begins processing events, i.e. after the window is painted.
+        QTimer.singleShot(0, self._deferred_init)
         
-        # IPC
-        self.ipc = IpcServer(self.dropzone)
-        self.ipc.start()
-        
-        # Global settings window tracker
-        self.settings_window = None
-        
-        # Apply startup-on-login setting from saved preferences
-        self._apply_startup_registry(self.settings.start_on_login)
-        
-        # Warn if critical tools are missing (delayed so tray is visible first)
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(2000, self._warn_missing_tools)
+        # Graceful process cleanup on exit
+        atexit.register(self._kill_orphan_processes)
 
+    # ── Deferred initialization ────────────────────────────────────────────
+
+    def _deferred_init(self):
+        """Heavy init that runs after the window is already on screen."""
+        self._ensure_handlers()   # discover tools + build handlers
+        
+        # Start IPC server (imports aiohttp lazily)
+        QTimer.singleShot(200, self._start_ipc)
+        
+        # Non-critical deferred work
+        QTimer.singleShot(500, lambda: self._apply_startup_registry(self.settings.start_on_login))
+        QTimer.singleShot(2000, self._check_for_updates)
+        QTimer.singleShot(2000, self._warn_missing_tools)
+        
         # Temp file cleanup timer
         self._cleanup_timer = QTimer()
         self._cleanup_timer.timeout.connect(self._cleanup_temp_files)
         self._cleanup_timer.start(600_000)  # every 10 minutes
         QTimer.singleShot(5000, self._cleanup_temp_files)  # initial sweep after 5s
 
-        # Graceful process cleanup on exit
-        atexit.register(self._kill_orphan_processes)
+    def _ensure_handlers(self):
+        """Lazily discover tools and build handlers. Safe to call multiple times.
+        
+        This is the on-demand fallback: if a file is dropped before
+        _deferred_init() runs, the dropzone's _submit() will trigger this.
+        """
+        if self._handlers_ready:
+            return
+        
+        from clyro.core.tools import discover_tools
+        from clyro.core.dispatcher import CommandDispatcher
+        from clyro.job_queue.service import QueueService
+        
+        self.tools = discover_tools()
+        self.cmd_dispatch = CommandDispatcher(self.settings, self.tools, None, None)
+        self.queue_service = QueueService(self.cmd_dispatch)
+        self._build_handlers()
+        
+        # Wire up the dropzone to the now-ready queue service
+        self.dropzone.queue = self.queue_service
+        self.queue_service.job_added.connect(self.dropzone._on_job_added)
+        self.queue_service.job_updated.connect(self.dropzone._on_job_updated)
+        
+        self._handlers_ready = True
+        logger.info("Handlers initialized (deferred init complete)")
+
+    def _start_ipc(self):
+        """Start IPC server — imports aiohttp lazily."""
+        from clyro.ipc.server import IpcServer
+        self.ipc = IpcServer(self.dropzone)
+        self.ipc.start()
 
     def toggle_dropzone(self):
         if self.dropzone.isVisible():
@@ -98,7 +128,9 @@ class AppManager:
         self.dropzone.activateWindow()
         
     def show_settings(self):
+        self._ensure_handlers()  # need tools for settings page
         if not self.settings_window:
+            from clyro.ui.settings_window import SettingsWindow
             self.settings_window = SettingsWindow(self.settings, self.store, self.tools)
             # Re-read settings instance changes when closed
             self.settings_window.settings_saved.connect(self._on_settings_saved)
@@ -107,6 +139,13 @@ class AppManager:
         self.settings_window.activateWindow()
         
     def _build_handlers(self):
+        # Lazy-import heavy core modules only when actually needed
+        from clyro.core.optimize import OptimizeDispatcher
+        from clyro.core.convert import ConvertDispatcher
+        from clyro.core.image import ImageHandler, ImageToImageHandler, ImageToPdfHandler
+        from clyro.core.video import VideoHandler, VideoToVideoHandler, VideoToImageHandler
+        from clyro.core.pdf import PdfHandler, PdfToImageHandler, PdfToWordHandler
+        
         # Handlers
         ih = ImageHandler(self.settings, self.tools)
         vh = VideoHandler(self.settings, self.tools)
@@ -125,6 +164,8 @@ class AppManager:
         self.cmd_dispatch.settings = self.settings
         self.cmd_dispatch.opt_dispatch = opt_dispatch
         self.cmd_dispatch.conv_dispatch = conv_dispatch
+        if self.queue_service:
+            self.queue_service.dispatcher = self.cmd_dispatch
         if hasattr(self, 'dropzone'):
             self.dropzone.settings = self.settings
 
@@ -139,6 +180,7 @@ class AppManager:
 
     def _apply_startup_registry(self, enabled: bool):
         """Write/remove Clyro from the Windows HKCU Run registry key."""
+        import winreg
         key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         try:
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)
@@ -159,6 +201,8 @@ class AppManager:
 
     def _warn_missing_tools(self):
         """Show a tray balloon if any critical external tool is not found."""
+        if not self._handlers_ready:
+            return
         missing = []
         if not self.tools.ffmpeg:
             missing.append("FFmpeg (video features disabled)")
@@ -166,7 +210,7 @@ class AppManager:
             missing.append("Ghostscript (PDF optimization disabled)")
         if missing and self.tray.isVisible():
             msg = "Missing tools: " + ", ".join(missing)
-            self.tray.showMessage("Clyro — Tools Missing", msg, msecs=6000)
+            self.tray.showMessage("Clyro \u2014 Tools Missing", msg, msecs=6000)
             
     def _cleanup_temp_files(self):
         """Delete stale Clyro temp files older than 1 hour."""
@@ -222,11 +266,12 @@ class AppManager:
     def _check_for_updates(self):
         """Spawns an async task to check for updates using the background thread."""
         try:
+            import asyncio
+            from clyro.updater import AutoUpdater
+            
             # Note: We hardcode version to match pyproject.toml "0.1.0"
             updater = AutoUpdater(current_version="0.1.0")
             
-            # Since we are in PyQt, we likely don't have a main async loop,
-            # so we queue this up via the existing queue_service threading, or run it directly.
             def _run_updater():
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -236,7 +281,6 @@ class AppManager:
                     loop.run_until_complete(updater.download_and_install(update_info["download_url"]))
                 loop.close()
 
-            # Offload to PyQt QThread / worker or plain threading
             import threading
             t = threading.Thread(target=_run_updater, daemon=True)
             t.start()
@@ -245,8 +289,10 @@ class AppManager:
 
     def quit(self):
         self.dropzone.quit()    # cancel in-flight downloads first
-        self.ipc.stop()
-        self._cleanup_timer.stop()
+        if self.ipc:
+            self.ipc.stop()
+        if hasattr(self, '_cleanup_timer'):
+            self._cleanup_timer.stop()
         self._kill_orphan_processes()
         self.store.save(self.settings)
         self.app.quit()

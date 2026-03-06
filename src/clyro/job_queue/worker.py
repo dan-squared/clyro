@@ -31,7 +31,6 @@ class JobRunner(QRunnable):
             
             self.job.status = "completed"
             self.job.result = result
-            self.job.progress = 1.0
             self.signals.completed.emit(self.job.id, result)
             
         except ClyroError as e:

@@ -6,15 +6,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from PIL import Image
-
 from clyro.core.types import Result
 from clyro.utils.entropy import calculate_shannon_entropy
-
-try:
-    from mozjpeg_lossless_optimization import optimize as _mozjpeg_optimize
-except ImportError:
-    _mozjpeg_optimize = None
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +23,11 @@ def _ensure_heif():
 
 def _mozjpeg_pass(path: Path) -> None:
     """Run a lossless mozjpeg re-compression pass on an existing JPEG on disk."""
-    if _mozjpeg_optimize is None:
+    try:
+        from mozjpeg_lossless_optimization import optimize as _mozjpeg_optimize
+    except ImportError:
         return
+    
     if path.suffix.lower() not in ('.jpg', '.jpeg'):
         return
     try:
@@ -124,6 +120,7 @@ class ImageHandler:
         _ensure_heif()
 
         real_type = _get_real_type(source)
+        from PIL import Image
         logger.debug(f"Optimizing {source.name} (detected type: {real_type})")
 
         resolution = "Unknown"
@@ -355,6 +352,7 @@ class ImageHandler:
     # ------------------------------------------------------------------
 
     def _optimize_jpeg(self, source: Path, out_path: Path, aggressive: bool, job: 'Job') -> bool:
+        from PIL import Image
         if not self.tools.jpegoptim:
             return False
 
@@ -399,6 +397,7 @@ class ImageHandler:
         return out_path.exists()
 
     def _optimize_png(self, source: Path, out_path: Path, aggressive: bool, job: 'Job') -> bool:
+        from PIL import Image
         if not self.tools.pngquant:
             return False
 
@@ -428,6 +427,7 @@ class ImageHandler:
         return True
 
     def _optimize_gif(self, source: Path, out_path: Path, aggressive: bool, job: 'Job') -> bool:
+        from PIL import Image
         if not self.tools.gifsicle:
             return False
 
@@ -510,6 +510,7 @@ class ImageHandler:
     @staticmethod
     def _strip_metadata(path: Path):
         """Strip non-essential EXIF/GPS metadata to save bytes before optimization."""
+        from PIL import Image
         try:
             with Image.open(path) as img:
                 data = list(img.getdata())
@@ -556,6 +557,7 @@ class ImageToImageHandler:
 
     def convert(self, source: Path, target_format: str, out_path: Path, signals, job: 'Job') -> Result:
         signals.progress.emit(job.id, (10, "Opening image…"))
+        from PIL import Image
         orig_size = source.stat().st_size
         _ensure_heif()
 
@@ -625,6 +627,7 @@ class ImageToPdfHandler:
         signals.progress.emit(job.id, (10, "Opening image…"))
         orig_size = source.stat().st_size
         _ensure_heif()
+        from PIL import Image
 
         res = None
         with Image.open(source) as img:

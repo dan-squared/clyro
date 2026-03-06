@@ -47,6 +47,9 @@ def _handle_collision(path: Path) -> Path:
     counter = 1
     new_path = path
     while new_path.exists():
+        if counter > 9999:
+            from clyro.errors import ClyroError
+            raise ClyroError("Cannot find a unique output filename (too many copies).")
         new_path = parent / f"{stem} ({counter}){suffix}"
         counter += 1
         

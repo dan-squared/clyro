@@ -1,9 +1,7 @@
-import sys
 import os
 import time
 import subprocess
 import tempfile
-import aiohttp
 import logging
 
 def _parse_version(v: str) -> tuple:
@@ -25,6 +23,7 @@ class AutoUpdater:
     async def check_for_updates(self) -> dict | None:
         """Check GitHub API for a newer release."""
         try:
+            import aiohttp
             async with aiohttp.ClientSession() as session:
                 async with session.get(self.api_url) as response:
                     if response.status == 200:
@@ -58,6 +57,7 @@ class AutoUpdater:
     async def download_and_install(self, download_url: str):
         """Download the installer and run it."""
         try:
+            import aiohttp
             temp_dir = tempfile.gettempdir()
             installer_path = os.path.join(temp_dir, f"ClyroSetup_update_{int(time.time())}.exe")
             
@@ -79,7 +79,11 @@ class AutoUpdater:
             subprocess.Popen([installer_path, "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART"])
             
             # Application needs to yield control to let installer over-write files
-            sys.exit(0)
+            from PyQt6.QtWidgets import QApplication
+            from PyQt6.QtCore import QMetaObject, Qt
+            app = QApplication.instance()
+            if app:
+                QMetaObject.invokeMethod(app, "quit", Qt.ConnectionType.QueuedConnection)
             
         except Exception as e:
             logger.error(f"Failed to download and install update: {e}")

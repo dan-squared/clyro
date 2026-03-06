@@ -88,7 +88,7 @@ def check_single_instance():
     """Returns True if another instance is already running."""
     try:
         # Try to connect to existing instance's IPC server
-        conn = http.client.HTTPConnection("localhost", 19847, timeout=1)
+        conn = http.client.HTTPConnection("localhost", 19847, timeout=0.15)
         conn.request("POST", "/show")
         resp = conn.getresponse()
         if resp.status == 200:
@@ -101,7 +101,6 @@ def main():
     multiprocessing.freeze_support()
     setup_logging()
     _install_crash_handler()
-    cleanup_stale_temp()
     
     logger = logging.getLogger(__name__)
     
@@ -113,6 +112,10 @@ def main():
 
     qt_app = QApplication(sys.argv)
     qt_app.setApplicationName("Clyro")
+    
+    # Defer non-critical housekeeping until after the window is visible
+    from PyQt6.QtCore import QTimer
+    QTimer.singleShot(3000, cleanup_stale_temp)
     
     # Ensure Windows Taskbar uses our custom AppUserModelID icon
     if sys.platform == "win32":

@@ -186,8 +186,11 @@ class DropzoneWindow(QWidget):
         """)
 
         self._apply_size(mode="idle")
-        self.queue.job_added.connect(self._on_job_added)
-        self.queue.job_updated.connect(self._on_job_updated)
+        # Signal connections are deferred: AppManager._ensure_handlers()
+        # wires them up after the queue service is created.
+        if self.queue is not None:
+            self.queue.job_added.connect(self._on_job_added)
+            self.queue.job_updated.connect(self._on_job_updated)
 
     # ─── Page builders ───────────────────────────────────────────────────────
 
@@ -681,7 +684,12 @@ class DropzoneWindow(QWidget):
                         output_mode="in_place" if not self.settings.keep_web_originals else "specific_folder",
                         output_dir=out_dir_path if self.settings.keep_web_originals else None
                     )
-                    self.queue.submit(cmd)
+                    from clyro.errors import QueueFullError
+                    try:
+                        self.queue.submit(cmd)
+                    except QueueFullError as e:
+                        self._flash_error("Queue full — clear history first")
+                        return
             else:
                 cmd = OptimiseCommand(
                     path=final_src_path, 
@@ -815,6 +823,11 @@ class DropzoneWindow(QWidget):
     # ─── Submit ───────────────────────────────────────────────────────────────
 
     def _submit(self, intent: DropIntent):
+        if self.queue is None:
+            # Handlers not ready yet (near-impossible: QTimer.singleShot(0)
+            # fires before any human can physically drop a file)
+            self._flash_error("Preparing\u2026 try again")
+            return
         from clyro.core.types import MergeCommand
         if intent.mode == "merge":
             # For merge, we only submit ONE command that contains all files
@@ -1186,7 +1199,7 @@ class DropzoneWindow(QWidget):
     def _reset_to_idle(self):
         if self._auto_dismiss_timer:
             self._auto_dismiss_timer.stop(); self._auto_dismiss_timer = None
-        if self._single_job_id:
+        if self._single_job_id and self.queue is not None:
             self.queue.cancel_job(self._single_job_id)
         self._single_job_id = None; self._single_result = None
         self._name_pill.hide(); self._conv_pill.hide(); self._merge_pill.hide(); self._s_actions.hide()
@@ -1195,7 +1208,8 @@ class DropzoneWindow(QWidget):
         self._apply_size(mode="idle")
 
     def _remove_item(self, job_id: str):
-        self.queue.cancel_job(job_id)
+        if self.queue is not None:
+            self.queue.cancel_job(job_id)
         item = self._batch_items.pop(job_id, None)
         if item: self._items_lay.removeWidget(item); item.deleteLater()
         if not self._batch_items: self._clear_all()
@@ -1204,8 +1218,9 @@ class DropzoneWindow(QWidget):
     def _clear_all(self):
         for item in list(self._batch_items.values()):
             self._items_lay.removeWidget(item); item.deleteLater()
-        self._batch_items.clear() 
-        self.queue.clear_history() 
+        self._batch_items.clear()
+        if self.queue is not None:
+            self.queue.clear_history()
         self._reset_to_idle()
 
     def _copy_all_results(self):
@@ -1296,6 +1311,8 @@ class DropzoneWindow(QWidget):
             logger.error(f"Save to folder failed: {e}")
 
     def _cancel_all(self):
+        if self.queue is None:
+            return
         for job_id in list(self._batch_items.keys()):
             self.queue.cancel_job(job_id)
 
