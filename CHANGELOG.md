@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2026-03-08
+
+### Added
+- Native global hotkey registration via `RegisterHotKey` (Win32), enabling `Ctrl+Alt+D` to toggle Clyro even when not focused.
+- Comprehensive Win32 `WM_HOTKEY` event filtering for robust background shortcut handling.
+- New unit tests for global shortcut parsing, registration, and dispatch logic.
+- A public `cancel_active_work` path in `DropzoneWindow` to allow the existing "Cancel" shortcut to work globally.
+
+### Changed
+- Refactored `AppManager` to automatically refresh global shortcut registrations when settings are saved.
+- Wired global shortcut initialization into the application startup, deferred initialization, and settings reload flows.
+- Ensured clean unregistration of all global hotkeys during application shutdown.
+
 ## [0.1.7] - 2026-03-07
 
 ### Fixed

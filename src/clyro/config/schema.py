@@ -57,6 +57,5 @@ class Settings:
 
     # Shortcuts
     shortcut_toggle_dropzone: str = "Ctrl+Alt+D"
-    shortcut_cancel_job: str = "Ctrl+Alt+X"
 
-    schema_version: int = 12
+    schema_version: int = 13

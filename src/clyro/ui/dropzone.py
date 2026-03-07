@@ -1676,10 +1676,29 @@ class DropzoneWindow(QWidget):
             logger.error(f"Save to folder failed: {e}")
 
     def _cancel_all(self):
-        if self.queue is None:
-            return
-        for job_id in list(self._batch_items.keys()):
-            self.queue.cancel_job(job_id)
+        self.cancel_active_work()
+
+    def cancel_active_work(self) -> bool:
+        cancelled = False
+
+        for worker in list(self._download_workers.values()):
+            worker.cancel()
+            cancelled = True
+
+        for scan_id in list(self._directory_scan_workers):
+            if self._cancel_directory_scan(scan_id, remove_placeholder=False):
+                cancelled = True
+
+        if self.queue is not None and self._single_job_id:
+            self.queue.cancel_job(self._single_job_id)
+            cancelled = True
+
+        if self.queue is not None:
+            for job_id in list(self._batch_items.keys()):
+                self.queue.cancel_job(job_id)
+                cancelled = True
+
+        return cancelled
 
     def quit(self):
         """Cancel all in-flight downloads and wait for threads to stop cleanly."""

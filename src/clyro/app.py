@@ -13,6 +13,7 @@ from clyro import __version__
 # Lightweight config — no heavy deps
 from clyro.config.store import SettingsStore
 from clyro.ui.dropzone import DropzoneWindow
+from clyro.ui.global_shortcuts import GlobalHotkeyManager
 from clyro.ui.tray import TrayIcon
 from clyro.ui.theme import Theme
 
@@ -55,6 +56,8 @@ class AppManager(QObject):
         self.update_check_failed.connect(self._handle_update_check_error)
         self.update_install_failed.connect(self._handle_update_install_error)
         self.update_download_ready.connect(self._handle_update_download_ready)
+        self.shortcut_manager = GlobalHotkeyManager(self.app)
+        self.app.aboutToQuit.connect(self.shortcut_manager.unregister_all)
         
         # Build & show UI immediately (uses only PyQt6 — no heavy deps)
         self.dropzone = DropzoneWindow(None, self.settings)  # queue_service=None for now
@@ -68,6 +71,7 @@ class AppManager(QObject):
         # Tray icon (lightweight)
         app_icon = icon or QIcon()
         self.tray = TrayIcon(self, app_icon)
+        self._apply_shortcuts()
         self._apply_surface_visibility()
         
         # ── Phase 2: Deferred — heavy init after event loop starts ────
@@ -138,7 +142,7 @@ class AppManager(QObject):
             
     def show_dropzone(self):
         self.dropzone.reveal()
-        
+
     def show_settings(self):
         self._ensure_handlers()  # need tools for settings page
         if not self.settings_window:
@@ -212,9 +216,17 @@ class AppManager(QObject):
         self.settings = self.store.load()
         self._build_handlers()
         self._apply_startup_registry(self.settings.start_on_login)
+        self._apply_shortcuts()
         self._apply_surface_visibility()
         if self.settings_window:
             self.settings_window.refresh_status()
+
+    def _apply_shortcuts(self):
+        self.shortcut_manager.sync(
+            {
+                "toggle_dropzone": (self.settings.shortcut_toggle_dropzone, self.toggle_dropzone),
+            }
+        )
 
     def _apply_surface_visibility(self):
         # Never allow the app to hide both its tray surface and dropzone.
@@ -568,6 +580,7 @@ class AppManager(QObject):
     def quit(self):
         if self._install_update_on_quit and self._pending_update_installer:
             self._install_pending_update(now=False)
+        self.shortcut_manager.unregister_all()
         self.dropzone.quit()    # cancel in-flight downloads first
         if self.ipc:
             self.ipc.stop()
