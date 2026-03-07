@@ -30,6 +30,7 @@ import time
 from PyQt6.QtWidgets import QApplication
 import multiprocessing
 
+from clyro.ipc.constants import IPC_HOST, IPC_PORT
 from clyro.utils.paths import get_app_data_dir, resource_path
 from clyro.app import AppManager
 from PyQt6.QtGui import QIcon
@@ -88,7 +89,7 @@ def check_single_instance():
     """Returns True if another instance is already running."""
     try:
         # Try to connect to existing instance's IPC server
-        conn = http.client.HTTPConnection("localhost", 19847, timeout=0.15)
+        conn = http.client.HTTPConnection(IPC_HOST, IPC_PORT, timeout=0.15)
         conn.request("POST", "/show")
         resp = conn.getresponse()
         if resp.status == 200:

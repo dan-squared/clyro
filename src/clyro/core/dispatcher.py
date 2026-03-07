@@ -10,7 +10,7 @@ from clyro.errors import FileNotSupportedError, ClyroError
 
 logger = logging.getLogger(__name__)
 
-def _wait_for_stable(path: Path, timeout: float = 10.0, interval: float = 0.3) -> None:
+def _wait_for_stable(path: Path, job: 'Job' = None, timeout: float = 10.0, interval: float = 0.3) -> None:
     """Wait until file's mtime stops changing (The waitForModificationDateToSettle).
 
     Prevents processing files that are still being written (e.g. browser downloads).
@@ -23,6 +23,9 @@ def _wait_for_stable(path: Path, timeout: float = 10.0, interval: float = 0.3) -
     stable_count = 0
     elapsed = 0.0
     while elapsed < timeout:
+        if job and job.is_cancelled:
+            return
+
         time.sleep(interval)
         elapsed += interval
         try:
@@ -66,7 +69,27 @@ class CommandDispatcher:
             raise FileNotSupportedError(f"Unsupported file type: {cmd.path.suffix}")
 
         # Wait for file to finish being written
-        _wait_for_stable(cmd.path)
+        _wait_for_stable(cmd.path, job)
+
+        # Resolve output path early for accurate disk space checks
+        if isinstance(cmd, OptimiseCommand):
+            out_path = resolve_output_path(cmd.path, self.settings, is_convert=False, override_dir=cmd.output_dir)
+        elif isinstance(cmd, ConvertCommand):
+            out_path = resolve_output_path(cmd.path, self.settings, is_convert=True, target_format=cmd.target_format, override_dir=cmd.output_dir)
+        elif isinstance(cmd, MergeCommand):
+            out_path = resolve_output_path(cmd.path, self.settings, is_convert=True, target_format=cmd.target_format, override_dir=cmd.output_dir)
+            merged_stem = f"{cmd.path.stem}_merged"
+            base_merged_name = merged_stem + out_path.suffix
+            final_out_path = out_path.with_name(base_merged_name)
+            
+            # Ensure unique name if "_merged" already exists
+            counter = 1
+            while final_out_path.exists():
+                final_out_path = final_out_path.with_name(f"{merged_stem}_{counter}{out_path.suffix}")
+                counter += 1
+            out_path = final_out_path
+        else:
+            raise ClyroError("Unknown command type.")
 
         # Pre-flight: ensure at least 2× source size of free disk space on the output drive
         try:
@@ -86,10 +109,16 @@ class CommandDispatcher:
                     if pdf_max > 0 and src_size > pdf_max * 1024 * 1024:
                         raise ClyroError(f"PDF too large (> {pdf_max} MB). Skipped.")
 
-            free = shutil.disk_usage(cmd.path.parent).free
+            # Note: We check out_path.parent to ensure we check the *destination* drive.
+            check_dir = out_path.parent
+            if not check_dir.exists():
+                # fallback if it's not created yet, though usually it exists or we can check its ancestors
+                check_dir = check_dir.parent
+                
+            free = shutil.disk_usage(check_dir).free
             if free < src_size * 2:
                 raise ClyroError(
-                    f"Not enough disk space. Need ~{src_size*2 // (1024*1024)} MB free, "
+                    f"Not enough disk space on output drive. Need ~{src_size*2 // (1024*1024)} MB free, "
                     f"but only {free // (1024*1024)} MB available."
                 )
         except ClyroError:
@@ -109,7 +138,6 @@ class CommandDispatcher:
                     if backup_path:
                         job.backup_path = backup_path
                 
-            out_path = resolve_output_path(cmd.path, self.settings, is_convert=False, override_dir=cmd.output_dir)
             result = self.opt_dispatch.optimize(cmd.path, out_path, media_type, cmd.aggressive, signals, job)
             return self._finalize_result(cmd.path, result)
             
@@ -118,13 +146,11 @@ class CommandDispatcher:
             if err:
                 raise ClyroError(err)
                 
-            out_path = resolve_output_path(cmd.path, self.settings, is_convert=True, target_format=cmd.target_format, override_dir=cmd.output_dir)
             target_type = classify_format(cmd.target_format)
             result = self.conv_dispatch.convert(cmd.path, cmd.target_format, out_path, media_type, target_type, signals, job)
             return self._finalize_result(cmd.path, result)
             
         elif isinstance(cmd, MergeCommand):
-            # Same pre-check logic using the first file (cmd.path)
             err = self.tools.check_can_convert(media_type, cmd.target_format)
             if err:
                 raise ClyroError(err)
@@ -142,22 +168,9 @@ class CommandDispatcher:
                 files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
             # "none" = keep original drop order
 
-            out_path = resolve_output_path(cmd.path, self.settings, is_convert=True, target_format=cmd.target_format, override_dir=cmd.output_dir)
-            
-            merged_stem = f"{cmd.path.stem}_merged"
-            base_merged_name = merged_stem + out_path.suffix
-            final_out_path = out_path.with_name(base_merged_name)
-            
-            # Ensure unique name if "_merged" already exists
-            counter = 1
-            while final_out_path.exists():
-                final_out_path = final_out_path.with_name(f"{merged_stem}_{counter}{out_path.suffix}")
-                counter += 1
-
             target_type = classify_format(cmd.target_format)
-            result = self.conv_dispatch.merge_to_pdf(files, final_out_path, media_type, signals, job)
-            return self._finalize_result(cmd.path, result)
-            
+            result = self.conv_dispatch.merge_to_pdf(files, out_path, media_type, signals, job)
+            return self._finalize_result(cmd.path, result)            
         else:
             raise ClyroError("Unknown command type.")
 

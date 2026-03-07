@@ -1,11 +1,13 @@
 import logging
+import time
+import uuid
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
     QFrame, QPushButton, QProgressBar, QGraphicsDropShadowEffect,
     QStackedWidget
 )
-from PyQt6.QtCore import Qt, QSize, QTimer
+from PyQt6.QtCore import Qt, QSize, QThread, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QIcon, QColor, QCursor
 
 from clyro.core.types import DropIntent, OptimiseCommand, ConvertCommand, MediaType
@@ -25,6 +27,133 @@ IDLE_H     = 160
 CARD_ITEM_H = 80   # each BatchItem height (pill 30 + card 48 + gap 2)
 CARD_GAP   = 6
 MAX_SHOW   = 5
+
+
+def _dedupe_paths(paths: list[Path]) -> list[Path]:
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for path in paths:
+        try:
+            key = str(path.resolve())
+        except OSError:
+            key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(path)
+    return unique
+
+
+def _intent_mode_from_modifiers(modifiers) -> str:
+    if modifiers & Qt.KeyboardModifier.AltModifier:
+        return "convert"
+    if modifiers & Qt.KeyboardModifier.ShiftModifier:
+        return "aggressive"
+    return "optimize"
+
+
+def _partition_drop_urls(urls) -> tuple[list[Path], list[Path], list[str]]:
+    local_paths: list[Path] = []
+    directory_paths: list[Path] = []
+    web_urls: list[str] = []
+
+    for url in urls:
+        if url.isLocalFile():
+            path = Path(url.toLocalFile())
+            if path.is_dir():
+                directory_paths.append(path)
+            elif path.suffix.lower() in _ALL_SUPPORTED:
+                local_paths.append(path)
+        elif url.scheme() in ("http", "https"):
+            web_urls.append(url.url())
+
+    return local_paths, directory_paths, web_urls
+
+
+def _resolve_web_download_command_mode(path: Path, settings) -> tuple[str, Path | None]:
+    destination = getattr(settings, "web_download_folder", None)
+    if not destination:
+        return settings.output_mode, None
+
+    try:
+        destination_path = Path(destination).resolve()
+        parent_path = path.parent.resolve()
+    except OSError:
+        return settings.output_mode, None
+
+    if parent_path != destination_path:
+        return settings.output_mode, None
+
+    if getattr(settings, "keep_web_originals", True):
+        return "specific_folder", destination_path
+    return "in_place", None
+
+
+def _collect_supported_paths(
+    roots: list[Path],
+    *,
+    should_cancel=None,
+    on_progress=None,
+) -> list[Path]:
+    found: list[Path] = []
+    seen: set[str] = set()
+    matches = 0
+
+    for root in roots:
+        if should_cancel and should_cancel():
+            break
+
+        for child in root.rglob("*"):
+            if should_cancel and should_cancel():
+                return found
+            if not child.is_file() or child.suffix.lower() not in _ALL_SUPPORTED:
+                continue
+
+            try:
+                key = str(child.resolve())
+            except OSError:
+                key = str(child)
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+            found.append(child)
+            matches += 1
+
+            if on_progress and matches % 25 == 0:
+                on_progress(matches, child.name)
+
+    if on_progress:
+        on_progress(matches, "")
+    return found
+
+
+class DirectoryScanWorker(QThread):
+    progress = pyqtSignal(str, int, str)
+    completed = pyqtSignal(str, object, float)
+    failed = pyqtSignal(str, str)
+
+    def __init__(self, scan_id: str, roots: list[Path]):
+        super().__init__()
+        self.scan_id = scan_id
+        self.roots = roots
+        self._cancelled = False
+
+    def cancel(self):
+        self._cancelled = True
+
+    def run(self):
+        started = time.perf_counter()
+        try:
+            paths = _collect_supported_paths(
+                self.roots,
+                should_cancel=lambda: self._cancelled,
+                on_progress=lambda count, current: self.progress.emit(self.scan_id, count, current),
+            )
+            self.completed.emit(self.scan_id, paths, time.perf_counter() - started)
+        except Exception as exc:
+            self.failed.emit(self.scan_id, str(exc))
 
 def _icon(name: str) -> QIcon:
     from clyro.utils.paths import resource_path
@@ -63,6 +192,7 @@ class DropzoneWindow(QWidget):
         self._single_result  = None
         self._batch_items: dict[str, "BatchItem"] = {}   # job_id → BatchItem
         self._download_workers = {}
+        self._directory_scan_workers: dict[str, dict[str, object]] = {}
         self._auto_dismiss_timer: QTimer | None = None  # auto-dismiss completed single results
         self._cached_timer: QTimer | None = None  # auto-dismiss cached single results
         self._hovering_result = False
@@ -486,6 +616,26 @@ class DropzoneWindow(QWidget):
     def _position_conv_pill(self):
         self._position_pill(self._conv_pill)
 
+    def _set_focus_acceptance(self, accept_focus: bool):
+        wants_no_focus = not accept_focus
+        has_no_focus = bool(self.windowFlags() & Qt.WindowType.WindowDoesNotAcceptFocus)
+        if has_no_focus == wants_no_focus:
+            return
+
+        self.setWindowFlag(Qt.WindowType.WindowDoesNotAcceptFocus, wants_no_focus)
+        self.show()
+
+    def reveal(self):
+        self._set_focus_acceptance(True)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        QTimer.singleShot(1500, lambda: self._set_focus_acceptance(False))
+
+    @pyqtSlot()
+    def reveal_from_ipc(self):
+        self.reveal()
+
     # ─── Drag / Drop ─────────────────────────────────────────────────────────
 
     def dragEnterEvent(self, event: QDragEnterEvent):
@@ -494,6 +644,15 @@ class DropzoneWindow(QWidget):
             return
 
         if not event.mimeData().hasUrls(): return
+
+        if (
+            getattr(self.settings, "dropzone_require_alt", False)
+            and not (event.modifiers() & Qt.KeyboardModifier.AltModifier)
+        ):
+            self._idle_title.setText("Hold Alt")
+            self._idle_hint.setText("Alt is required before dropping")
+            event.ignore()
+            return
 
         # Drop validation: reject unsupported-only drops
         urls = event.mimeData().urls()
@@ -547,29 +706,12 @@ class DropzoneWindow(QWidget):
     def dropEvent(self, event: QDropEvent):
         self._drag_over = False; self._clear_drag_style()
 
-        local_paths = []
-        web_urls = []
-        for u in event.mimeData().urls():
-            if u.isLocalFile():
-                p = Path(u.toLocalFile())
-                # Recursive directory drop
-                if p.is_dir():
-                    for child in p.rglob('*'):
-                        if child.is_file() and child.suffix.lower() in _ALL_SUPPORTED:
-                            local_paths.append(child)
-                else:
-                    local_paths.append(p)
-            elif u.scheme() in ('http', 'https'):
-                web_urls.append(u.url())
+        local_paths, directory_paths, web_urls = _partition_drop_urls(event.mimeData().urls())
 
-        if not local_paths and not web_urls: return
+        if not local_paths and not directory_paths and not web_urls:
+            return
 
-        mods = event.modifiers()
-        intent_mode = "optimize"
-        if mods & Qt.KeyboardModifier.AltModifier:
-            intent_mode = "convert"
-        elif mods & Qt.KeyboardModifier.ShiftModifier:
-            intent_mode = "aggressive"
+        intent_mode = _intent_mode_from_modifiers(event.modifiers())
 
         if web_urls:
             if intent_mode == "convert" and len(web_urls) > 1:
@@ -578,16 +720,10 @@ class DropzoneWindow(QWidget):
             for url in web_urls:
                 self._start_download(url, intent_mode)
 
-        if local_paths:
-            if intent_mode == "convert":
-                types = {classify(p) for p in local_paths}
-                if len(types) > 1 or MediaType.UNSUPPORTED in types:
-                    self._flash_error("Same type required for batch convert"); return
-                self._show_convert_pill(DropIntent(mode="convert", files=local_paths))
-            elif intent_mode == "aggressive":
-                self._submit(DropIntent(mode="aggressive", files=local_paths))
-            else:
-                self._submit(DropIntent(mode="optimize", files=local_paths))
+        if directory_paths:
+            self._start_directory_scan(directory_paths, local_paths, intent_mode)
+        elif local_paths:
+            self._handle_local_paths(local_paths, intent_mode)
 
     def _start_download(self, url: str, intent_mode: str):
         import uuid
@@ -684,12 +820,7 @@ class DropzoneWindow(QWidget):
                         output_mode="in_place" if not self.settings.keep_web_originals else "specific_folder",
                         output_dir=out_dir_path if self.settings.keep_web_originals else None
                     )
-                    from clyro.errors import QueueFullError
-                    try:
-                        self.queue.submit(cmd)
-                    except QueueFullError as e:
-                        self._flash_error("Queue full — clear history first")
-                        return
+                    self._submit_command(cmd)
             else:
                 cmd = OptimiseCommand(
                     path=final_src_path, 
@@ -697,7 +828,7 @@ class DropzoneWindow(QWidget):
                     output_mode="in_place" if not self.settings.keep_web_originals else "specific_folder", 
                     output_dir=out_dir_path if self.settings.keep_web_originals else None
                 )
-                self.queue.submit(cmd)
+                self._submit_command(cmd)
             
         def _on_failed(msg: str, orig_url: str):
             worker.wait()  # ensure thread fully stopped before cleanup
@@ -822,6 +953,17 @@ class DropzoneWindow(QWidget):
 
     # ─── Submit ───────────────────────────────────────────────────────────────
 
+    def _submit_command(self, cmd) -> bool:
+        from clyro.errors import QueueFullError
+
+        try:
+            self.queue.submit(cmd)
+            return True
+        except QueueFullError:
+            self._flash_error("Queue full — clear history first")
+            return False
+
+    @pyqtSlot(object)
     def _submit(self, intent: DropIntent):
         if self.queue is None:
             # Handlers not ready yet (near-impossible: QTimer.singleShot(0)
@@ -838,7 +980,7 @@ class DropzoneWindow(QWidget):
                 sort_order=getattr(self.settings, 'pdf_merge_sort_order', 'none'),
                 output_mode=self.settings.output_mode
             )
-            self.queue.submit(cmd)
+            self._submit_command(cmd)
             return
 
         for path in intent.files:
@@ -846,9 +988,8 @@ class DropzoneWindow(QWidget):
                 cmd = OptimiseCommand(path, aggressive=True, output_mode=self.settings.output_mode)
             elif intent.mode == "convert":
                 # Web Download Conversion: Respect "keep originals" if the file is already in the download destination
-                if str(path.parent) == self.settings.web_download_folder:
-                    cmd_mode = "specific_folder" if self.settings.keep_web_originals else "in_place"
-                    cmd_dir  = Path(self.settings.web_download_folder) if self.settings.keep_web_originals else None
+                cmd_mode, cmd_dir = _resolve_web_download_command_mode(path, self.settings)
+                if cmd_mode != self.settings.output_mode or cmd_dir is not None:
                     cmd = ConvertCommand(path, target_format=intent.target_format, output_mode=cmd_mode, output_dir=cmd_dir)
                 else:
                     cmd = ConvertCommand(path, target_format=intent.target_format, output_mode=self.settings.output_mode)
@@ -865,7 +1006,140 @@ class DropzoneWindow(QWidget):
                     )
                 else:
                     cmd = OptimiseCommand(path, aggressive=False, output_mode=self.settings.output_mode)
-            self.queue.submit(cmd)
+            self._submit_command(cmd)
+
+    def _handle_local_paths(self, local_paths: list[Path], intent_mode: str):
+        local_paths = _dedupe_paths(local_paths)
+        if not local_paths:
+            self._flash_error("No supported files found")
+            return
+
+        if intent_mode == "convert":
+            types = {classify(p) for p in local_paths}
+            if len(types) > 1 or MediaType.UNSUPPORTED in types:
+                self._flash_error("Same type required for batch convert")
+                return
+            self._show_convert_pill(DropIntent(mode="convert", files=local_paths))
+        elif intent_mode == "aggressive":
+            self._submit(DropIntent(mode="aggressive", files=local_paths))
+        else:
+            self._submit(DropIntent(mode="optimize", files=local_paths))
+
+    def _promote_single_to_batch(self):
+        if self._single_job_id is None or self._single_job_id in self._batch_items:
+            return
+
+        stem_text = self._pill_stem.text()
+        ext_text = self._pill_ext.text()
+        self._make_batch_item(self._single_job_id, stem_text + ext_text)
+        self._single_job_id = None
+        self._s_actions.hide()
+
+    def _start_directory_scan(self, roots: list[Path], direct_files: list[Path], intent_mode: str):
+        scan_id = f"scan_{uuid.uuid4().hex[:8]}"
+        label = roots[0].name if len(roots) == 1 else f"{len(roots)} folders"
+
+        if self._single_job_id is not None:
+            self._promote_single_to_batch()
+
+        item = self._make_batch_item(scan_id, label)
+        item.set_processing(-1, "Indexing folders...")
+        self._enter_batch_mode()
+
+        worker = DirectoryScanWorker(scan_id, roots)
+        worker.progress.connect(self._on_directory_scan_progress)
+        worker.completed.connect(self._on_directory_scan_completed)
+        worker.failed.connect(self._on_directory_scan_failed)
+        worker.finished.connect(worker.deleteLater)
+
+        self._directory_scan_workers[scan_id] = {
+            "worker": worker,
+            "roots": roots,
+            "direct_files": list(direct_files),
+            "intent_mode": intent_mode,
+            "cancelled": False,
+        }
+        worker.start()
+
+    def _cancel_directory_scan(self, scan_id: str, *, remove_placeholder: bool = True) -> bool:
+        state = self._directory_scan_workers.get(scan_id)
+        if state is None:
+            return False
+
+        state["cancelled"] = True
+        worker = state["worker"]
+        worker.cancel()
+        if remove_placeholder:
+            self._remove_scan_placeholder(scan_id)
+        return True
+
+    def _remove_scan_placeholder(self, scan_id: str):
+        item = self._batch_items.pop(scan_id, None)
+        if item:
+            self._items_lay.removeWidget(item)
+            item.deleteLater()
+        if self._batch_items:
+            self._apply_size(mode="batch", card_count=len(self._batch_items))
+
+    @pyqtSlot(str, int, str)
+    def _on_directory_scan_progress(self, scan_id: str, count: int, current: str):
+        item = self._batch_items.get(scan_id)
+        if item is None:
+            return
+
+        detail = f"Indexed {count} files"
+        if current:
+            detail += f" - {current[:16]}"
+        item.set_processing(-1, detail)
+
+    @pyqtSlot(str, object, float)
+    def _on_directory_scan_completed(self, scan_id: str, discovered_paths: list[Path], duration_s: float):
+        state = self._directory_scan_workers.pop(scan_id, None)
+        self._remove_scan_placeholder(scan_id)
+        if state is None:
+            return
+
+        if self.queue is not None:
+            self.queue.record_directory_scan(state["roots"], len(discovered_paths), duration_s)
+
+        if state["cancelled"]:
+            if not self._batch_items and self._single_job_id is None:
+                self._reset_to_idle()
+            return
+
+        local_paths = _dedupe_paths(state["direct_files"] + list(discovered_paths))
+        if not local_paths:
+            if not self._batch_items and self._single_job_id is None:
+                self._reset_to_idle()
+            self._flash_error("No supported files found")
+            return
+
+        self._handle_local_paths(local_paths, state["intent_mode"])
+
+    @pyqtSlot(str, str)
+    def _on_directory_scan_failed(self, scan_id: str, message: str):
+        state = self._directory_scan_workers.pop(scan_id, None)
+        self._remove_scan_placeholder(scan_id)
+        if state is None or state["cancelled"]:
+            if not self._batch_items and self._single_job_id is None:
+                self._reset_to_idle()
+            return
+
+        logger.error("Directory scan failed for %s: %s", state["roots"], message)
+        if not self._batch_items and self._single_job_id is None:
+            self._reset_to_idle()
+        self._flash_error("Folder scan failed")
+
+    def _batch_jobs_are_terminal(self) -> bool:
+        if self.queue is None or not self._batch_items:
+            return False
+
+        terminal = {"completed", "failed", "cached", "cancelled"}
+        for job_id in self._batch_items:
+            job = self.queue.get_job(job_id)
+            if job is None or job.status not in terminal:
+                return False
+        return True
 
     # ─── Queue callbacks ──────────────────────────────────────────────────────
 
@@ -890,10 +1164,7 @@ class DropzoneWindow(QWidget):
                 already_has_single = False
 
         # ── Batch resume: auto-clear stale completed items ─
-        if already_has_batch and all(
-            (bi.card._bar.isHidden() if hasattr(bi.card, '_bar') else True)
-            for bi in self._batch_items.values()
-        ):
+        if already_has_batch and self._batch_jobs_are_terminal():
             for item in list(self._batch_items.values()):
                 self._items_lay.removeWidget(item); item.deleteLater()
             self._batch_items.clear()
@@ -910,12 +1181,8 @@ class DropzoneWindow(QWidget):
             self._enter_single_mode(job)
         else:
             # Second+ file: upgrade to / stay in batch mode
-            if already_has_single and self._single_job_id not in self._batch_items:
-                stem_text = self._pill_stem.text()
-                ext_text  = self._pill_ext.text()
-                self._make_batch_item(self._single_job_id, stem_text + ext_text)
-                self._single_job_id = None
-                self._s_actions.hide()
+            if already_has_single:
+                self._promote_single_to_batch()
 
             self._make_batch_item(job.id, job.command.path.name)
             self._enter_batch_mode()
@@ -968,73 +1235,159 @@ class DropzoneWindow(QWidget):
         item = self._batch_items.get(job.id)
         if item: self._update_batch_item(item, job)
 
+    def _stop_cached_timer(self):
+        if self._cached_timer:
+            self._cached_timer.stop()
+            self._cached_timer = None
+
+    def _set_single_result_buttons(
+        self,
+        *,
+        show_undo: bool,
+        show_minus: bool,
+        show_zap: bool,
+        show_play: bool,
+    ):
+        self._btn_undo.setVisible(show_undo)
+        self._btn_minus.setVisible(show_minus)
+        self._btn_zap.setVisible(show_zap)
+        self._btn_play.setVisible(show_play)
+
+    def _format_single_size_change(self, original_size: int, final_size: int) -> str:
+        if original_size > 0:
+            return (
+                f"<span style='color:#FF5252;'>{_fmt(original_size)}</span>"
+                f"<span style='color:rgba(255,255,255,0.45);'>&nbsp;→&nbsp;</span>"
+                f"<span style='color:#FFD54F;'>{_fmt(final_size)}</span>"
+            )
+        return f"<span style='color:#FFD54F;'>{_fmt(final_size)}</span>"
+
+    def _friendly_failure(self, job) -> tuple[str, str]:
+        message = (job.error_message or "Something went wrong").strip()
+        detail = (job.error_detail or message).strip()
+        haystack = f"{message} {detail}".lower()
+
+        if "required for" in haystack or "not available" in haystack:
+            return "Tool unavailable", message
+        if "not enough disk space" in haystack:
+            return "Not enough space", message
+        if "unsupported file type" in haystack:
+            return "Unsupported file", message
+        if "timed out" in haystack:
+            return "Timed out", message
+        return "Failed", message
+
+    def _render_completed_single(self, job):
+        result = job.result
+        outcome = getattr(result, "outcome", "optimized")
+        detail = result.detail or ""
+        self._s_close.setIcon(_icon("x-bold.svg"))
+        self._s_center.setCurrentIndex(1)
+
+        if outcome == "skipped_larger":
+            self._single_result = result.source_path
+            self._s_diff.setText(
+                f"<span style='color:#FFD54F;font-weight:700;'>Skipped</span>"
+                f"<span style='color:rgba(255,255,255,0.45);'>&nbsp;·&nbsp;</span>"
+                f"{self._format_single_size_change(result.original_size, result.optimized_size)}"
+            )
+            self._s_res_lbl.setText(
+                f"<span style='color:rgba(255,255,255,0.55);'>{detail or 'Kept the original because the result was larger.'}</span>"
+            )
+            self._set_single_result_buttons(
+                show_undo=False,
+                show_minus=False,
+                show_zap=not self._single_aggressive,
+                show_play=False,
+            )
+            return
+
+        if outcome == "unchanged":
+            self._single_result = result.source_path
+            self._s_diff.setText(
+                "<span style='color:rgba(255,255,255,0.85);font-weight:700;'>No smaller result</span>"
+            )
+            self._s_res_lbl.setText(
+                f"<span style='color:rgba(255,255,255,0.55);'>{detail or 'The original file was kept.'}</span>"
+            )
+            self._set_single_result_buttons(
+                show_undo=False,
+                show_minus=False,
+                show_zap=not self._single_aggressive,
+                show_play=False,
+            )
+            return
+
+        self._single_result = result.output_path
+        self._s_diff.setText(self._format_single_size_change(result.original_size, result.optimized_size))
+
+        label = result.resolution or "Done"
+        if outcome == "converted":
+            label = f"{label}  ·  Converted" if result.resolution else "Converted"
+        elif outcome == "merged":
+            label = f"{label}  ·  Merged" if result.resolution else "Merged"
+        self._s_res_lbl.setText(label)
+        show_undo = bool(getattr(job, "backup_path", None))
+        show_minus = outcome == "optimized"
+        self._set_single_result_buttons(
+            show_undo=show_undo,
+            show_minus=show_minus,
+            show_zap=(not self._single_aggressive and outcome == "optimized"),
+            show_play=False,
+        )
+
+        if getattr(self.settings, 'auto_copy_to_clipboard', False):
+            self._do_auto_copy(result.output_path)
+
     def _update_single(self, job):
+        if job.status != "cached":
+            self._stop_cached_timer()
+
         if job.status == "processing":
             self._s_center.setCurrentIndex(0)
             pct, detail = 0, ""
-            if isinstance(job.progress, tuple) and len(job.progress) == 2:
-                pct, detail = int(job.progress[0]), job.progress[1]
-            elif isinstance(job.progress, (int, float)):
-                pct = int(job.progress * 100)
+            if isinstance(job.progress_state, tuple) and len(job.progress_state) == 2:
+                pct, detail = int(job.progress_state[0]), job.progress_state[1]
+            elif isinstance(job.progress_state, (int, float)):
+                pct = int(job.progress_state * 100)
             self._s_bar.setValue(pct); self._s_detail.setText(detail)
-            self._btn_undo.hide()
+            self._set_single_result_buttons(show_undo=False, show_minus=False, show_zap=False, show_play=False)
         elif job.status == "completed" and job.result:
-            self._s_close.setIcon(_icon("x-bold.svg"))
-            self._s_center.setCurrentIndex(1)
-            self._single_result = job.result.output_path
-            orig = job.result.original_size; opt = job.result.optimized_size
-            if orig > 0:
-                self._s_diff.setText(
-                    f"<span style='color:#FF5252;'>{_fmt(orig)}</span>"
-                    f"<span style='color:rgba(255,255,255,0.45);'>&nbsp;→&nbsp;</span>"
-                    f"<span style='color:#FFD54F;'>{_fmt(opt)}</span>"
-                )
-            else:
-                self._s_diff.setText(f"<span style='color:#FFD54F;'>{_fmt(opt)}</span>")
-
-            if job.result.resolution:
-                self._s_res_lbl.setText(job.result.resolution)
-            else:
-                self._s_res_lbl.setText("Done")
-            self._btn_undo.show()
-            self._btn_minus.show()
-            # Show aggressive button only if this was a normal optimization
-            if self._single_aggressive:
-                self._btn_zap.hide()
-            else:
-                self._btn_zap.show()
-
-            # Auto-dismiss completed single result after 30s
+            self._render_completed_single(job)
             self._start_auto_dismiss()
-            
-            if getattr(self.settings, 'auto_copy_to_clipboard', False):
-                self._do_auto_copy(job.result.output_path)
         elif job.status == "failed":
+            title, detail = self._friendly_failure(job)
             self._s_close.setIcon(_icon("x-bold.svg"))
             self._s_center.setCurrentIndex(1)
-            self._s_diff.setText("Failed")
+            self._single_result = None
+            self._s_diff.setText(title)
             self._s_res_lbl.setText(
-                f"<span style='color:rgba(220,80,80,0.85);'>{job.error_message}</span>"
+                f"<span style='color:rgba(220,80,80,0.85);'>{detail}</span>"
             )
-            self._btn_undo.show()
+            self._set_single_result_buttons(show_undo=False, show_minus=False, show_zap=False, show_play=False)
+        elif job.status == "cancelled":
+            self._s_close.setIcon(_icon("x-bold.svg"))
+            self._s_center.setCurrentIndex(1)
+            self._single_result = None
+            self._s_diff.setText("Cancelled")
+            self._s_res_lbl.setText(
+                "<span style='color:rgba(255,255,255,0.55);'>The job was cancelled before completion.</span>"
+            )
+            self._set_single_result_buttons(show_undo=False, show_minus=False, show_zap=False, show_play=False)
         elif job.status == "cached":
             # Render "Already optimized" cache hit state with force-reoptimize option and auto-dismissal
             self._s_close.setIcon(_icon("x-bold.svg"))
             self._s_center.setCurrentIndex(1)
+            self._single_result = job.result.output_path if job.result else None
             self._s_diff.setText(
                 "<span style='color:rgba(76,175,80,0.9);font-weight:600;'>Already optimized</span>"
             )
             self._s_res_lbl.setText(
-                "<span style='color:rgba(255,255,255,0.45);'>Skipped — file unchanged</span>"
+                "<span style='color:rgba(255,255,255,0.45);'>Skipped - file already matched the current settings.</span>"
             )
-            self._btn_undo.hide()
-            self._btn_minus.hide()
-            self._btn_zap.hide()
-            self._btn_play.show()  # Let user force re-optimize
+            self._set_single_result_buttons(show_undo=False, show_minus=False, show_zap=False, show_play=True)
 
             # Auto-dismiss back to idle after 5 seconds instead of 3
-            if self._cached_timer:
-                self._cached_timer.stop()
             self._cached_timer = QTimer(self)
             self._cached_timer.setSingleShot(True)
             self._cached_timer.timeout.connect(self._reset_to_idle)
@@ -1043,19 +1396,28 @@ class DropzoneWindow(QWidget):
     def _update_batch_item(self, item: "BatchItem", job):
         if job.status == "processing":
             pct, detail = 0, ""
-            if isinstance(job.progress, tuple) and len(job.progress) == 2:
-                pct, detail = int(job.progress[0]), job.progress[1]
-            elif isinstance(job.progress, (int, float)):
-                pct = int(job.progress * 100)
+            if isinstance(job.progress_state, tuple) and len(job.progress_state) == 2:
+                pct, detail = int(job.progress_state[0]), job.progress_state[1]
+            elif isinstance(job.progress_state, (int, float)):
+                pct = int(job.progress_state * 100)
             item.card.set_processing(pct, detail)
         elif job.status == "completed" and job.result:
-            item.card.set_done(job.result.original_size, job.result.optimized_size, job.result.output_path)
-            if getattr(self.settings, 'auto_copy_to_clipboard', False):
+            outcome = getattr(job.result, "outcome", "optimized")
+            if outcome == "skipped_larger":
+                item.card.set_notice("Skipped - larger output", tone="warning", out=job.result.source_path)
+            elif outcome == "unchanged":
+                item.card.set_notice("No smaller result", tone="muted", out=job.result.source_path)
+            else:
+                item.card.set_done(job.result.original_size, job.result.optimized_size, job.result.output_path)
+            if getattr(self.settings, 'auto_copy_to_clipboard', False) and outcome not in {"skipped_larger", "unchanged"}:
                 self._do_auto_copy(job.result.output_path)
         elif job.status == "failed":
-            item.card.set_failed(job.error_message or "Failed")
+            title, detail = self._friendly_failure(job)
+            item.card.set_failed(f"{title}: {detail}")
+        elif job.status == "cancelled":
+            item.card.set_notice("Cancelled", tone="muted")
         elif job.status == "cached":
-            item.card.set_failed("Already optimized")
+            item.card.set_notice("Already optimized", tone="success", out=job.result.output_path if job.result else None)
 
     # ─── Side button actions ──────────────────────────────────────────────────
 
@@ -1071,6 +1433,8 @@ class DropzoneWindow(QWidget):
         src = job.result.output_path or job.command.path
         if not src.exists():
             return
+        if self.queue is not None:
+            self.queue.invalidate_cache_for_path(src)
         # Clear old result state
         self._single_job_id = None
         self._single_result = None
@@ -1094,12 +1458,8 @@ class DropzoneWindow(QWidget):
             return
             
         # Clear cached hash so it doesn't get skipped
-        from clyro.core.backup import file_hash
-        try:
-            fhash = file_hash(src)
-            self.queue._optimised_cache.pop(fhash, None)
-        except Exception:
-            pass
+        if self.queue is not None:
+            self.queue.invalidate_cache_for_path(src)
             
         # Clear old result state
         self._single_job_id = None
@@ -1120,12 +1480,8 @@ class DropzoneWindow(QWidget):
         if not src.exists():
             return
         # Clear cached hash so it doesn't get skipped
-        from clyro.core.backup import file_hash
-        try:
-            fhash = file_hash(src)
-            self.queue._optimised_cache.pop(fhash, None)
-        except Exception:
-            pass
+        if self.queue is not None:
+            self.queue.invalidate_cache_for_path(src)
         # Clear old result state
         self._single_job_id = None
         self._single_result = None
@@ -1146,6 +1502,8 @@ class DropzoneWindow(QWidget):
         if backup_path and Path(backup_path).exists():
             try:
                 restore_file(Path(backup_path), job.command.path)
+                if self.queue is not None:
+                    self.queue.invalidate_cache_for_path(job.command.path)
             except Exception as e:
                 logger.warning(f"Undo failed: {e}")
         self._reset_to_idle()
@@ -1199,6 +1557,7 @@ class DropzoneWindow(QWidget):
     def _reset_to_idle(self):
         if self._auto_dismiss_timer:
             self._auto_dismiss_timer.stop(); self._auto_dismiss_timer = None
+        self._stop_cached_timer()
         if self._single_job_id and self.queue is not None:
             self.queue.cancel_job(self._single_job_id)
         self._single_job_id = None; self._single_result = None
@@ -1208,6 +1567,10 @@ class DropzoneWindow(QWidget):
         self._apply_size(mode="idle")
 
     def _remove_item(self, job_id: str):
+        if self._cancel_directory_scan(job_id):
+            if not self._batch_items:
+                self._reset_to_idle()
+            return
         if self.queue is not None:
             self.queue.cancel_job(job_id)
         item = self._batch_items.pop(job_id, None)
@@ -1216,6 +1579,8 @@ class DropzoneWindow(QWidget):
         else: self._apply_size(mode="batch", card_count=len(self._batch_items))
 
     def _clear_all(self):
+        for scan_id in list(self._directory_scan_workers):
+            self._cancel_directory_scan(scan_id, remove_placeholder=False)
         for item in list(self._batch_items.values()):
             self._items_lay.removeWidget(item); item.deleteLater()
         self._batch_items.clear()
@@ -1322,6 +1687,13 @@ class DropzoneWindow(QWidget):
             worker.cancel()
             worker.wait(2000)  # max 2 seconds per worker
         self._download_workers.clear()
+
+        for scan_id, state in list(self._directory_scan_workers.items()):
+            state["cancelled"] = True
+            worker = state["worker"]
+            worker.cancel()
+            worker.wait(1000)
+            self._directory_scan_workers.pop(scan_id, None)
 
     # ─── Window drag & double click ───────────────────────────────────────────
 
@@ -1527,7 +1899,12 @@ class BatchItem(QWidget):
     def set_processing(self, pct: int = 0, detail: str = ""):
         self._name_lbl.setStyleSheet("font-size:11px;font-weight:700;color:rgba(255,255,255,0.60);background:transparent;")
         self._ext_lbl.setStyleSheet("font-size:11px;font-weight:600;color:rgba(255,255,255,0.50);background:transparent;")
-        self._bar.setValue(pct); self._bar.show()
+        if pct < 0:
+            self._bar.setRange(0, 0)
+        else:
+            self._bar.setRange(0, 100)
+            self._bar.setValue(pct)
+        self._bar.show()
         if detail:
             # downloading messages might be long
             text = f"{pct}% - {detail[:20]}" if pct > 0 else f"{detail[:25]}"
@@ -1540,6 +1917,7 @@ class BatchItem(QWidget):
     def set_done(self, orig: int, final: int, out: Path):
         self._name_lbl.setStyleSheet("font-size:11px;font-weight:700;color:rgba(255,255,255,0.95);background:transparent;")
         self._ext_lbl.setStyleSheet("font-size:11px;font-weight:600;color:rgba(255,255,255,0.85);background:transparent;")
+        self._bar.setRange(0, 100)
         self.output_path = out; self._bar.hide()
         if orig > 0 and orig != final:
             txt = (f"<span style='color:#FF5252;'>{_fmt(orig)}</span>"
@@ -1550,9 +1928,29 @@ class BatchItem(QWidget):
         self._status.setText(txt); self._status.setStyleSheet("font-family: 'Space Mono', monospace; font-size:11px;")
         self._body.setStyleSheet(self._BODY_DONE_STYLE)
 
+    def set_notice(self, msg: str, tone: str = "neutral", out: Path | None = None):
+        tones = {
+            "neutral": ("rgba(255,255,255,0.65)", "rgba(255,255,255,0.55)", "rgba(255,255,255,0.75)"),
+            "success": ("rgba(76,175,80,0.95)", "rgba(76,175,80,0.85)", "rgba(76,175,80,0.95)"),
+            "warning": ("rgba(255,213,79,0.95)", "rgba(255,213,79,0.85)", "rgba(255,213,79,0.95)"),
+            "muted": ("rgba(255,255,255,0.55)", "rgba(255,255,255,0.45)", "rgba(255,255,255,0.55)"),
+        }
+        name_color, ext_color, status_color = tones.get(tone, tones["neutral"])
+        self._name_lbl.setStyleSheet(f"font-size:11px;font-weight:700;color:{name_color};background:transparent;")
+        self._ext_lbl.setStyleSheet(f"font-size:11px;font-weight:600;color:{ext_color};background:transparent;")
+        self._bar.setRange(0, 100)
+        self._bar.hide()
+        self.output_path = out
+        self._status.setText(msg[:38])
+        self._status.setStyleSheet(
+            f"font-family: 'Segoe UI Variable Display', sans-serif; font-size:11px; color:{status_color};"
+        )
+        self._body.setStyleSheet(self._BODY_DONE_STYLE)
+
     def set_failed(self, msg: str):
         self._name_lbl.setStyleSheet("font-size:11px;font-weight:700;color:rgba(255,50,50,0.80);background:transparent;")
         self._ext_lbl.setStyleSheet("font-size:11px;font-weight:600;color:rgba(255,50,50,0.70);background:transparent;")
+        self._bar.setRange(0, 100)
         self._bar.hide()
         self._status.setText(msg[:38])
         self._status.setStyleSheet("font-family: 'Segoe UI Variable Display', sans-serif; font-size:11px;color:rgba(255,82,82,0.85);")

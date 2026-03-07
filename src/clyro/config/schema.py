@@ -15,7 +15,9 @@ class Settings:
     backup_originals: bool = True       # Keep original in %APPDATA%/Clyro/backups
     start_on_login: bool = False
     show_tray: bool = True
+    auto_update_enabled: bool = True
     allow_screenshots: bool = False
+    skipped_update_version: str | None = None
 
     # Quality
     quality_preset: Literal["balanced", "max", "custom"] = "balanced"
@@ -57,4 +59,4 @@ class Settings:
     shortcut_toggle_dropzone: str = "Ctrl+Alt+D"
     shortcut_cancel_job: str = "Ctrl+Alt+X"
 
-    schema_version: int = 10
+    schema_version: int = 12

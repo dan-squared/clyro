@@ -5,6 +5,8 @@ import re
 import shutil
 import subprocess
 import time
+import threading
+import queue
 from pathlib import Path
 
 from clyro.core.types import Result
@@ -19,6 +21,21 @@ _CPU_COUNT = os.cpu_count() or 2
 # ---------------------------------------------------------------------------
 
 _HW_ENCODER_CACHE: dict[str, str | None] = {}
+
+
+def _track_temp_path(job: 'Job | None', path: Path | None) -> None:
+    if job is not None and path is not None:
+        job.register_temp_path(path)
+
+
+def _cleanup_temp_path(job: 'Job | None', path: Path | None) -> None:
+    if path is None:
+        return
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as exc:
+        logger.debug("Deferred video temp cleanup for %s: %s", path, exc)
+        _track_temp_path(job, path)
 
 def _detect_hw_encoder(ffmpeg_path) -> str | None:
     """Auto-detect the best available H.264 hardware encoder.
@@ -156,6 +173,17 @@ def _run_ffmpeg(
                     universal_newlines=True,
                 )
 
+                q = queue.Queue()
+                def enqueue_output(out, q_obj):
+                    try:
+                        for line in iter(out.readline, ''):
+                            q_obj.put(line)
+                    finally:
+                        out.close()
+
+                t = threading.Thread(target=enqueue_output, args=(process.stdout, q), daemon=True)
+                t.start()
+
                 while True:
                     if job and job.is_cancelled:
                         process.kill()
@@ -164,11 +192,12 @@ def _run_ffmpeg(
                             out_path.unlink(missing_ok=True)
                         return None
 
-                    line = process.stdout.readline()
-                    if not line:
+                    try:
+                        line = q.get(timeout=0.1)
+                    except queue.Empty:
                         if process.poll() is not None:
                             break
-                        time.sleep(0.01)
+                        time.sleep(0.01) # Small sleep to prevent busy-waiting
                         continue
 
                     # Parse progress
@@ -246,7 +275,15 @@ class VideoHandler:
         total_duration = meta["duration"]
 
         if job.is_cancelled:
-            return Result(source, source, orig_size, orig_size, resolution=resolution)
+            return Result(
+                source,
+                source,
+                orig_size,
+                orig_size,
+                resolution=resolution,
+                outcome="unchanged",
+                detail="Cancelled before optimization completed.",
+            )
 
         # ---- Build encoder args ----
         encoder_args = self._build_encoder_args(aggressive, out_path)
@@ -296,7 +333,15 @@ class VideoHandler:
 
         if job and job.is_cancelled:
             out_path.unlink(missing_ok=True)
-            return Result(source, source, orig_size, orig_size, resolution=resolution)
+            return Result(
+                source,
+                source,
+                orig_size,
+                orig_size,
+                resolution=resolution,
+                outcome="unchanged",
+                detail="Cancelled before optimization completed.",
+            )
 
         if result is None or not out_path.exists():
             raise ToolExecutionError("FFmpeg completed but output file was not created.")
@@ -307,7 +352,15 @@ class VideoHandler:
         skip_larger = self.settings.skip_if_larger if self.settings else True
         if opt_size >= orig_size and skip_larger and out_path != source:
             out_path.unlink(missing_ok=True)
-            return Result(source, source, orig_size, orig_size, resolution=resolution)
+            return Result(
+                source,
+                source,
+                orig_size,
+                opt_size,
+                resolution=resolution,
+                outcome="skipped_larger",
+                detail="Kept the original because the optimized file was larger.",
+            )
 
         # Copystat to preserve timestamps
         if out_path.exists():
@@ -317,7 +370,7 @@ class VideoHandler:
                 logger.debug(f"copystat failed: {e}")
 
         signals.progress.emit(job.id, (100, "Done"))
-        return Result(source, out_path, orig_size, opt_size, resolution=resolution)
+        return Result(source, out_path, orig_size, opt_size, resolution=resolution, outcome="optimized")
 
     def _build_encoder_args(self, aggressive: bool, out_path: Path, force_software: bool = False) -> list[str]:
         """Build video encoder arguments.
@@ -439,7 +492,7 @@ class VideoToVideoHandler:
                 logger.debug(f"copystat failed: {e}")
 
         signals.progress.emit(job.id, (100, "Done"))
-        return Result(source, out_path, orig_size, out_path.stat().st_size, resolution=resolution)
+        return Result(source, out_path, orig_size, out_path.stat().st_size, resolution=resolution, outcome="converted")
 
 # =========================================================================
 # VideoToImageHandler — video → GIF with palette generation
@@ -470,6 +523,7 @@ class VideoToImageHandler:
         # Two-pass palette-based GIF for higher quality (The app uses gifski;
         # we use ffmpeg's palettegen/paletteuse which is cross-platform)
         palette_path = out_path.with_name(f"_palette_{out_path.stem}.png")
+        _track_temp_path(job, palette_path)
 
         # FPS and scale filters
         fps = min(meta["fps"] or 10, 15)  # Cap GIF FPS at 15
@@ -498,7 +552,7 @@ class VideoToImageHandler:
             return self._single_pass_gif(source, out_path, vf_base, signals, job, orig_size, resolution, total_duration)
 
         if job.is_cancelled:
-            palette_path.unlink(missing_ok=True)
+            _cleanup_temp_path(job, palette_path)
             out_path.unlink(missing_ok=True)
             return None
 
@@ -523,7 +577,7 @@ class VideoToImageHandler:
         )
 
         # Clean up palette
-        palette_path.unlink(missing_ok=True)
+        _cleanup_temp_path(job, palette_path)
 
         if job and job.is_cancelled:
             out_path.unlink(missing_ok=True)
@@ -540,7 +594,7 @@ class VideoToImageHandler:
                 logger.debug(f"copystat failed: {e}")
 
         signals.progress.emit(job.id, (100, "Done"))
-        return Result(source, out_path, orig_size, out_path.stat().st_size, resolution=resolution)
+        return Result(source, out_path, orig_size, out_path.stat().st_size, resolution=resolution, outcome="converted")
 
     def _single_pass_gif(
         self, source: Path, out_path: Path, vf_base: str,
@@ -577,4 +631,4 @@ class VideoToImageHandler:
                 logger.debug(f"copystat failed: {e}")
 
         signals.progress.emit(job.id, (100, "Done"))
-        return Result(source, out_path, orig_size, out_path.stat().st_size, resolution=resolution)
+        return Result(source, out_path, orig_size, out_path.stat().st_size, resolution=resolution, outcome="converted")

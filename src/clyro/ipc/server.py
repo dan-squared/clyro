@@ -5,6 +5,8 @@ from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
 from clyro.core.types import DropIntent
 from pathlib import Path
 
+from clyro.ipc.constants import IPC_HOST, IPC_PORT
+
 logger = logging.getLogger(__name__)
 
 class IpcServer:
@@ -14,12 +16,12 @@ class IpcServer:
         self.loop = None
         self.thread = None
         
-    def start(self, port=19847):
+    def start(self, host: str = IPC_HOST, port: int = IPC_PORT):
         self.loop = asyncio.new_event_loop()
-        self.thread = Thread(target=self._run_server, args=(port,), daemon=True)
+        self.thread = Thread(target=self._run_server, args=(host, port), daemon=True)
         self.thread.start()
         
-    def _run_server(self, port):
+    def _run_server(self, host, port):
         from aiohttp import web
         self._web = web  # store for handler methods
         asyncio.set_event_loop(self.loop)
@@ -29,13 +31,13 @@ class IpcServer:
         app.router.add_post('/show', self.handle_show)
         self.runner = web.AppRunner(app)
         self.loop.run_until_complete(self.runner.setup())
-        site = web.TCPSite(self.runner, 'localhost', port)
+        site = web.TCPSite(self.runner, host, port)
         try:
             self.loop.run_until_complete(site.start())
-            logger.info(f"IPC Server running on localhost:{port}")
+            logger.info(f"IPC Server running on {host}:{port}")
             self.loop.run_forever()
         except OSError as e:
-            logger.warning(f"Failed to start IPC Server (port {port}): {e}. IPC commands will be unavailable.")
+            logger.warning(f"Failed to start IPC Server ({host}:{port}): {e}. IPC commands will be unavailable.")
             # App can still run without IPC listener, just background CLI hooks won't work in this specific instance
         
     async def handle_optimize(self, request):
@@ -70,7 +72,7 @@ class IpcServer:
     async def handle_show(self, request):
         # show() is also a UI call — dispatch to main thread
         QMetaObject.invokeMethod(
-            self.dropzone, "show",
+            self.dropzone, "reveal_from_ipc",
             Qt.ConnectionType.QueuedConnection
         )
         return self._web.json_response({"status": "shown"})

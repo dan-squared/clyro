@@ -13,6 +13,56 @@ logger = logging.getLogger(__name__)
 
 _heif_registered = False
 _CPU_COUNT = os.cpu_count() or 2
+_TRIAL_MIN_BYTES = 256 * 1024
+_TRIAL_MAX_BYTES = 32 * 1024 * 1024
+_TRIAL_MIN_PIXELS = 300_000
+_TRIAL_MAX_PIXELS = 24_000_000
+
+
+def _should_preserve_image_metadata(settings) -> bool:
+    if not settings:
+        return True
+    if getattr(settings, "strip_metadata", False):
+        return False
+    return getattr(settings, "image_preserve_metadata", True)
+
+
+def _track_temp_path(job: 'Job | None', path: Path | None) -> None:
+    if job is not None and path is not None:
+        job.register_temp_path(path)
+
+
+def _cleanup_temp_path(job: 'Job | None', path: Path | None) -> None:
+    if path is None:
+        return
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as exc:
+        logger.debug("Deferred image temp cleanup for %s: %s", path, exc)
+        _track_temp_path(job, path)
+
+
+def _select_adaptive_trial(
+    real_type: str,
+    *,
+    has_alpha: bool,
+    entropy: float,
+    source_size: int,
+    pixel_count: int,
+    tools,
+) -> str | None:
+    if source_size < _TRIAL_MIN_BYTES or pixel_count < _TRIAL_MIN_PIXELS:
+        return None
+    if source_size > _TRIAL_MAX_BYTES or pixel_count > _TRIAL_MAX_PIXELS:
+        return None
+
+    if real_type == "png" and not has_alpha and tools.jpegoptim:
+        return "jpeg" if entropy >= 4.2 and source_size >= 512 * 1024 else None
+
+    if real_type == "jpeg" and tools.pngquant:
+        return "png" if entropy <= 4.4 and source_size >= 384 * 1024 else None
+
+    return None
 
 def _ensure_heif():
     global _heif_registered
@@ -80,17 +130,37 @@ def _get_real_type(path: Path) -> str:
 # Subprocess helper
 # ---------------------------------------------------------------------------
 
-def _run_tool(cmd: list[str], *, check: bool = True, tries: int = 1) -> subprocess.CompletedProcess | None:
-    """Run an external tool with retries.  Returns None on all-fail when check=False."""
+def _run_tool(
+    cmd: list[str], *, check: bool = True, tries: int = 1, cancel_event=None
+) -> subprocess.CompletedProcess | None:
+    """Run an external tool with retries. Returns None on all-fail when check=False."""
     last_err = None
     for attempt in range(tries):
         try:
-            return subprocess.run(
+            process = subprocess.Popen(
                 cmd,
-                check=check,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
+            
+            # Simple polling loop to allow cancellation
+            while process.poll() is None:
+                if cancel_event and cancel_event():
+                    process.kill()
+                    process.wait()
+                    return None
+                try:
+                    process.wait(timeout=0.2)
+                except subprocess.TimeoutExpired:
+                    pass
+
+            out, err = process.communicate()
+            if check and process.returncode != 0:
+                raise subprocess.CalledProcessError(process.returncode, cmd, output=out, stderr=err)
+                
+            return subprocess.CompletedProcess(process.args, process.returncode, out, err)
+
         except subprocess.CalledProcessError as e:
             last_err = e
             if attempt < tries - 1:
@@ -129,14 +199,26 @@ class ImageHandler:
                 resolution = f"{img.width}×{img.height}"
                 has_alpha = img.mode in ('RGBA', 'P', 'LA')
                 entropy = calculate_shannon_entropy(img)
+                pixel_count = img.width * img.height
 
                 # ---- Convert unoptimized formats (TIFF/BMP) to standard workflow formats ----
                 if real_type in ("tiff", "bmp"):
                     signals.progress.emit(job.id, (10, f"Converting {real_type.upper()} to optimizable format…"))
+                    original_source = source
                     real_type, source = self._convert_foreign(img, source, real_type, has_alpha)
+                    if source != original_source:
+                        _track_temp_path(job, source)
 
                 if job.is_cancelled:
-                    return Result(source, source, orig_size, orig_size, resolution=resolution)
+                    return Result(
+                        source,
+                        source,
+                        orig_size,
+                        orig_size,
+                        resolution=resolution,
+                        outcome="unchanged",
+                        detail="Cancelled before optimization completed.",
+                    )
 
                 # ---- Format Evaluation: Determine if a secondary format should be trialed in parallel ----
                 adaptive = getattr(self.settings, "image_adaptive_format", True) if self.settings else True
@@ -144,14 +226,17 @@ class ImageHandler:
                 run_trial = False  # should we also trial an alternate format?
 
                 if adaptive and aggressive:
-                    if real_type == "png" and not has_alpha and self.tools.jpegoptim:
-                        # Opaque PNG → also trial JPEG
+                    alt_type = _select_adaptive_trial(
+                        real_type,
+                        has_alpha=has_alpha,
+                        entropy=entropy,
+                        source_size=orig_size,
+                        pixel_count=pixel_count,
+                        tools=self.tools,
+                    )
+                    if alt_type is not None:
                         run_trial = True
-                        target_type = "png"  # primary stays png
-                    elif real_type == "jpeg" and entropy < 5.0 and self.tools.pngquant:
-                        # Low-entropy JPEG → also trial PNG
-                        run_trial = True
-                        target_type = "jpeg"
+                        target_type = real_type
 
                 # Resolve actual out_path (handle format change extension)
                 actual_out_path = self._resolve_ext(out_path, target_type, real_type)
@@ -160,7 +245,7 @@ class ImageHandler:
 
                 # Prepare a work file if we need to strip metadata first
                 work_file = source
-                strip = getattr(self.settings, 'strip_metadata', False) if self.settings else False
+                strip = not _should_preserve_image_metadata(self.settings)
                 
                 if strip:
                     dest_dir = actual_out_path.parent
@@ -168,6 +253,7 @@ class ImageHandler:
                     tmp_name = f"_clyro_tmp_meta_{int(time.time())}_{source.name}"
                     work_file = dest_dir / tmp_name
                     shutil.copy2(source, work_file)
+                    _track_temp_path(job, work_file)
                     
                     signals.progress.emit(job.id, (20, "Stripping metadata…"))
                     self._strip_metadata(work_file)
@@ -190,7 +276,7 @@ class ImageHandler:
                         self._pillow_fallback(img, actual_out_path, target_type, aggressive)
                         
                 if work_file != source and work_file.exists():
-                    work_file.unlink(missing_ok=True)
+                    _cleanup_temp_path(job, work_file)
 
         except Exception as e:
             logger.error(f"Image optimization failed: {e}")
@@ -198,7 +284,15 @@ class ImageHandler:
 
         if not actual_out_path.exists():
             # Safety: return original unchanged
-            return Result(source, source, orig_size, orig_size, resolution=resolution)
+            return Result(
+                source,
+                source,
+                orig_size,
+                orig_size,
+                resolution=resolution,
+                outcome="unchanged",
+                detail="No optimized output was produced.",
+            )
 
         opt_size = actual_out_path.stat().st_size
 
@@ -206,7 +300,15 @@ class ImageHandler:
         skip_larger = self.settings.skip_if_larger if self.settings else True
         if opt_size >= orig_size and skip_larger and actual_out_path != source:
             actual_out_path.unlink(missing_ok=True)
-            return Result(source, source, orig_size, orig_size, resolution=resolution)
+            return Result(
+                source,
+                source,
+                orig_size,
+                opt_size,
+                resolution=resolution,
+                outcome="skipped_larger",
+                detail="Kept the original because the optimized file was larger.",
+            )
 
         # Copystat to preserve timestamps
         if actual_out_path.exists():
@@ -216,7 +318,7 @@ class ImageHandler:
                 logger.debug(f"copystat failed: {e}")
 
         signals.progress.emit(job.id, (100, "Done"))
-        return Result(source, actual_out_path, orig_size, opt_size, resolution=resolution)
+        return Result(source, actual_out_path, orig_size, opt_size, resolution=resolution, outcome="optimized")
 
     # ------------------------------------------------------------------
     # Parallel dual-format trial
@@ -230,36 +332,47 @@ class ImageHandler:
 
         alt_type = "jpeg" if real_type == "png" else "png"
         alt_out = primary_out.with_suffix(".jpg" if alt_type == "jpeg" else ".png")
+        _track_temp_path(job, primary_out)
+        _track_temp_path(job, alt_out)
 
         # Ensure alt_out doesn't collide with primary_out
         if alt_out == primary_out:
             alt_out = primary_out.with_name(f"{primary_out.stem}_trial{alt_out.suffix}")
+            _track_temp_path(job, alt_out)
 
         # Make temporary work files for the alternate format if we need conversion
         alt_work = None
         if alt_type == "jpeg" and real_type != "jpeg":
             alt_work = alt_out.with_suffix(".tmp.jpg")
             img.convert("RGB").save(alt_work, "JPEG", quality=95)
+            _track_temp_path(job, alt_work)
         elif alt_type == "png" and real_type != "png":
             alt_work = alt_out.with_suffix(".tmp.png")
             img.save(alt_work, "PNG")
+            _track_temp_path(job, alt_work)
 
         results: dict[str, Path | None] = {}
 
         def _run_primary():
-            ok = self._optimize_single(img, source, primary_out, real_type, real_type, aggressive, job)
+            from PIL import Image
+
+            ok = self._optimize_single(None, source, primary_out, real_type, real_type, aggressive, job)
             if not ok:
-                self._pillow_fallback(img, primary_out, real_type, aggressive)
+                with Image.open(source) as fallback_img:
+                    self._pillow_fallback(fallback_img, primary_out, real_type, aggressive)
             return primary_out if primary_out.exists() else None
 
         def _run_alt():
+            from PIL import Image
+
             work = alt_work or source
-            ok = self._optimize_single(img, work, alt_out, alt_type, alt_type, aggressive, job)
+            ok = self._optimize_single(None, work, alt_out, alt_type, alt_type, aggressive, job)
             if not ok:
-                self._pillow_fallback(img, alt_out, alt_type, aggressive)
+                with Image.open(work) as fallback_img:
+                    self._pillow_fallback(fallback_img, alt_out, alt_type, aggressive)
             # Clean up temp work file
             if alt_work and alt_work.exists() and alt_work != alt_out:
-                alt_work.unlink(missing_ok=True)
+                _cleanup_temp_path(job, alt_work)
             return alt_out if alt_out.exists() else None
 
         signals.progress.emit(job.id, (30, f"Trial: {real_type.upper()} vs {alt_type.upper()}…"))
@@ -286,7 +399,7 @@ class ImageHandler:
             # Format switching threshold: require at least 100KB of savings to justify changing the underlying file extension
             if p_size - a_size > 100_000:
                 logger.info(f"Adaptive: {alt_type} wins ({a_size:,} vs {p_size:,} bytes)")
-                p_out.unlink(missing_ok=True)
+                _cleanup_temp_path(job, p_out)
                 # Handle collision for the new extension in the output directory
                 from clyro.core.output import _handle_collision
                 final = _handle_collision(a_out)
@@ -295,7 +408,7 @@ class ImageHandler:
                     a_out = final
                 return a_out
             else:
-                a_out.unlink(missing_ok=True)
+                _cleanup_temp_path(job, a_out)
                 return p_out
         elif a_out:
             return a_out
@@ -310,19 +423,31 @@ class ImageHandler:
     # ------------------------------------------------------------------
 
     def _optimize_single(
-        self, img: Image.Image, source: Path, out_path: Path,
+        self, img: Image.Image | None, source: Path, out_path: Path,
         target_type: str, real_type: str, aggressive: bool, job: 'Job',
     ) -> bool:
         """Optimise using the best available external tool.  Returns True on success."""
+        from PIL import Image
+
+        def _convert_with_local_image(fmt: str, save_fn):
+            if img is not None:
+                save_fn(img)
+                return
+            with Image.open(source) as local_img:
+                save_fn(local_img)
 
         if target_type == "jpeg":
             work_file = source
             if real_type != "jpeg":
                 work_file = out_path.with_suffix(".tmp.jpg")
-                img.convert("RGB").save(work_file, "JPEG", quality=95)
+                _track_temp_path(job, work_file)
+                _convert_with_local_image(
+                    "JPEG",
+                    lambda active_img: active_img.convert("RGB").save(work_file, "JPEG", quality=95),
+                )
             ok = self._optimize_jpeg(work_file, out_path, aggressive, job)
             if work_file != source and work_file.exists():
-                work_file.unlink(missing_ok=True)
+                _cleanup_temp_path(job, work_file)
             if not ok:
                 logger.info(f"jpegoptim not available — falling back to Pillow for {source.name}")
             return ok
@@ -331,10 +456,14 @@ class ImageHandler:
             work_file = source
             if real_type != "png":
                 work_file = out_path.with_suffix(".tmp.png")
-                img.save(work_file, "PNG")
+                _track_temp_path(job, work_file)
+                _convert_with_local_image(
+                    "PNG",
+                    lambda active_img: active_img.save(work_file, "PNG"),
+                )
             ok = self._optimize_png(work_file, out_path, aggressive, job)
             if work_file != source and work_file.exists():
-                work_file.unlink(missing_ok=True)
+                _cleanup_temp_path(job, work_file)
             if not ok:
                 logger.info(f"pngquant not available — falling back to Pillow for {source.name}")
             return ok
@@ -369,6 +498,7 @@ class ImageHandler:
         dest_dir = out_path.parent
         tmp_name = f"_clyro_tmp_{int(time.time())}_{source.name}"
         tmp_path = dest_dir / tmp_name
+        _track_temp_path(job, tmp_path)
 
         shutil.copy2(source, tmp_path)
 
@@ -381,11 +511,15 @@ class ImageHandler:
             str(tmp_path),
         ]
 
-        result = _run_tool(cmd, check=False, tries=3)
+        result = _run_tool(cmd, check=False, tries=3, cancel_event=lambda: job.is_cancelled)
+        if job and job.is_cancelled:
+            if tmp_path.exists():
+                _cleanup_temp_path(job, tmp_path)
+            return False
         if result is None or result.returncode != 0:
             logger.warning(f"jpegoptim failed (returncode={result.returncode if result else 'None'}): {result.stderr.decode() if result and result.stderr else 'no output'}")
             if tmp_path.exists():
-                tmp_path.unlink(missing_ok=True)
+                _cleanup_temp_path(job, tmp_path)
             return False
 
         if tmp_path.exists():
@@ -420,7 +554,10 @@ class ImageHandler:
             str(source),
         ]
 
-        result = _run_tool(cmd, check=False, tries=3)
+        result = _run_tool(cmd, check=False, tries=3, cancel_event=lambda: job.is_cancelled)
+        if job and job.is_cancelled:
+            if out_path.exists(): out_path.unlink(missing_ok=True)
+            return False
         if not (out_path.exists() and out_path.stat().st_size > 0):
             logger.warning(f"pngquant failed: {result.stderr.decode() if result and result.stderr else 'no output'}")
             return False
@@ -445,7 +582,10 @@ class ImageHandler:
             cmd.append("--colors=256")
         cmd += ["--output", str(out_path), str(source)]
 
-        result = _run_tool(cmd, check=False, tries=3)
+        result = _run_tool(cmd, check=False, tries=3, cancel_event=lambda: job.is_cancelled)
+        if job and job.is_cancelled:
+            if out_path.exists(): out_path.unlink(missing_ok=True)
+            return False
         if not (out_path.exists() and out_path.stat().st_size > 0):
             logger.warning(f"gifsicle failed: {result.stderr.decode() if result and result.stderr else 'no output'}")
             return False
@@ -495,7 +635,7 @@ class ImageHandler:
     def _pillow_fallback(self, img: Image.Image, out_path: Path, target_type: str, aggressive: bool):
         """Fallback to Pillow's native optimization if external C-binaries fail or are absent."""
         quality = 75 if aggressive else (self.settings.image_jpeg_quality if self.settings else 80)
-        exif = img.info.get("exif")
+        exif = img.info.get("exif") if _should_preserve_image_metadata(self.settings) else None
         kwargs = {"exif": exif} if exif else {}
         if target_type == "webp":
             img.save(out_path, quality=quality, method=6, **kwargs)
@@ -552,7 +692,8 @@ class ImageHandler:
 # =========================================================================
 
 class ImageToImageHandler:
-    def __init__(self, tools):
+    def __init__(self, settings, tools):
+        self.settings = settings
         self.tools = tools
 
     def convert(self, source: Path, target_format: str, out_path: Path, signals, job: 'Job') -> Result:
@@ -583,14 +724,14 @@ class ImageToImageHandler:
                 elif target_format in ('jpg', 'jpeg'):
                     quality = 85
 
-                exif = img.info.get("exif")
+                exif = img.info.get("exif") if _should_preserve_image_metadata(self.settings) else None
                 kwargs = {"exif": exif} if exif else {}
                 img.save(out_path, quality=quality, optimize=True, **kwargs)
 
             # Post-conversion optimization pass
             if not job.is_cancelled:
                 signals.progress.emit(job.id, (80, "Compressing…"))
-                handler = ImageHandler(None, self.tools)
+                handler = ImageHandler(self.settings, self.tools)
                 if target_format in ('jpg', 'jpeg'):
                     handler._optimize_jpeg(out_path, out_path, aggressive=False, job=job)
                 elif target_format == 'png':
@@ -613,7 +754,7 @@ class ImageToImageHandler:
                 logger.debug(f"copystat failed: {e}")
 
         signals.progress.emit(job.id, (100, "Done"))
-        return Result(source, out_path, orig_size, out_path.stat().st_size, resolution=res)
+        return Result(source, out_path, orig_size, out_path.stat().st_size, resolution=res, outcome="converted")
 
 # =========================================================================
 # ImageToPdfHandler — image → PDF conversion & merging
@@ -642,9 +783,11 @@ class ImageToPdfHandler:
             img.save(out_path, "PDF", resolution=100.0)
 
         signals.progress.emit(job.id, (100, "Done"))
-        return Result(source, out_path, orig_size, out_path.stat().st_size, resolution=res)
+        return Result(source, out_path, orig_size, out_path.stat().st_size, resolution=res, outcome="converted")
 
     def merge(self, sources: list[Path], out_path: Path, signals, job: 'Job') -> Result:
+        from PIL import Image
+
         signals.progress.emit(job.id, (0, "Starting merge…"))
 
         if not sources:
@@ -693,4 +836,4 @@ class ImageToPdfHandler:
             del append_images
 
         signals.progress.emit(job.id, (100, "Done"))
-        return Result(sources[0], out_path, orig_size, out_path.stat().st_size, resolution=res)
+        return Result(sources[0], out_path, orig_size, out_path.stat().st_size, resolution=res, outcome="merged")

@@ -12,7 +12,7 @@ class MediaType(Enum):
 @dataclass
 class JobSnapshot:
     id: str
-    status: Literal["queued", "processing", "completed", "failed", "cancelled"]
+    status: Literal["queued", "processing", "completed", "failed", "cancelled", "cached"]
     progress: float  # 0.0 to 1.0
     command: 'Command'
     result: 'Result | None'
@@ -25,6 +25,8 @@ class Result:
     original_size: int
     optimized_size: int
     resolution: str | None = None
+    outcome: Literal["optimized", "unchanged", "skipped_larger", "converted", "merged"] = "optimized"
+    detail: str | None = None
 
     @property
     def reduction_percent(self) -> float:

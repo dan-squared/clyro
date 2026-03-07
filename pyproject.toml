@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clyro"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Windows media optimization app migrated from Clop."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -26,6 +26,9 @@ clyro-cli = "clyro.cli.commands:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+
+[tool.setuptools.dynamic]
+version = {attr = "clyro.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]

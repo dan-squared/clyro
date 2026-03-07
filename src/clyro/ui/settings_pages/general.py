@@ -5,73 +5,15 @@ from PyQt6.QtWidgets import (
     QComboBox
 )
 from PyQt6.QtCore import Qt
+from clyro.ui import settings_theme as theme
 
-LABEL_STYLE = "font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.45); letter-spacing: 0.8px;"
-SECTION_STYLE = """
-    QFrame#section {
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.07);
-        border-radius: 10px;
-    }
-"""
-RADIO_STYLE = """
-    QRadioButton {
-        font-size: 13px; color: rgba(255,255,255,0.85); spacing: 10px; padding: 2px 0;
-    }
-    QRadioButton::indicator {
-        width: 16px; height: 16px; border-radius: 8px;
-        border: 1.5px solid rgba(255,255,255,0.25); background: transparent;
-    }
-    QRadioButton::indicator:hover {
-        border: 1.5px solid rgba(255,255,255,0.5);
-    }
-    QRadioButton::indicator:checked {
-        border: 4px solid rgba(255,255,255,0.15); background: #FFFFFF;
-    }
-"""
-CHECKBOX_STYLE = """
-    QCheckBox {
-        font-size: 13px; color: rgba(255,255,255,0.85); spacing: 10px; padding: 2px 0;
-    }
-    QCheckBox::indicator {
-        width: 18px; height: 18px; border-radius: 4px;
-        border: 1.5px solid rgba(255,255,255,0.25); background: transparent;
-    }
-    QCheckBox::indicator:hover {
-        border: 1.5px solid rgba(255,255,255,0.5);
-    }
-    QCheckBox::indicator:checked {
-        border: 1.5px solid #FFFFFF; background: #FFFFFF;
-        image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMjIyMjIyIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMjAgNiA5IDE3IDQgMTIiPjwvcG9seWxpbmU+PC9zdmc+");
-    }
-"""
-INPUT_STYLE = """
-    QLineEdit {
-        background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(255,255,255,0.12);
-        border-radius: 6px;
-        padding: 5px 10px;
-        font-size: 12px;
-        color: rgba(255,255,255,0.75);
-    }
-    QLineEdit:focus {
-        border-color: rgba(255,255,255,0.3);
-        background: rgba(255,255,255,0.08);
-    }
-"""
-BTN_STYLE = """
-    QPushButton {
-        background: rgba(255,255,255,0.08);
-        border: 1px solid rgba(255,255,255,0.12);
-        border-radius: 6px;
-        padding: 5px 12px;
-        font-size: 12px;
-        color: rgba(255,255,255,0.75);
-    }
-    QPushButton:hover {
-        background: rgba(255,255,255,0.14);
-    }
-"""
+LABEL_STYLE = theme.LABEL_STYLE
+SECTION_STYLE = theme.SECTION_STYLE
+RADIO_STYLE = theme.RADIO_STYLE
+CHECKBOX_STYLE = theme.CHECKBOX_STYLE
+INPUT_STYLE = theme.INPUT_STYLE
+BTN_STYLE = theme.BUTTON_STYLE
+COMBO_STYLE = theme.COMBO_STYLE
 
 def _section(title: str) -> tuple[QFrame, QVBoxLayout]:
     """Returns a styled section card and its inner layout."""
@@ -97,7 +39,9 @@ class GeneralPage(QWidget):
     def __init__(self, settings):
         super().__init__()
         self.settings = settings
-        self.setStyleSheet("background: transparent;")
+        self.setStyleSheet(
+            f"background: transparent; color: {theme.TEXT_PRIMARY}; font-family: {theme.FONT_STACK};"
+        )
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -136,14 +80,25 @@ class GeneralPage(QWidget):
         inner.addLayout(folder_row)
         inner.addWidget(self.rb_inplace)
 
+        output_hint = QLabel(
+            "Same folder is the safest default. In-place rewrites the original file, so backups matter more."
+        )
+        output_hint.setWordWrap(True)
+        output_hint.setStyleSheet(theme.HINT_STYLE)
+        inner.addWidget(output_hint)
+
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.HLine)
-        divider.setStyleSheet("color: rgba(255,255,255,0.07);")
+        divider.setStyleSheet(theme.DIVIDER_STYLE)
         inner.addWidget(divider)
 
         self.chk_skip = QCheckBox("Skip if output is larger\nthan original")
         self.chk_skip.setStyleSheet(CHECKBOX_STYLE)
         inner.addWidget(self.chk_skip)
+        skip_hint = QLabel("Keeps the source untouched when compression would produce a larger file.")
+        skip_hint.setWordWrap(True)
+        skip_hint.setStyleSheet(theme.HINT_STYLE)
+        inner.addWidget(skip_hint)
 
         layout.addWidget(sec)
 
@@ -153,7 +108,7 @@ class GeneralPage(QWidget):
         web_folder_row = QHBoxLayout()
         web_folder_row.setSpacing(8)
         self.lbl_web_folder = QLabel("Save dropped URLs to:")
-        self.lbl_web_folder.setStyleSheet("font-size: 13px; color: rgba(255,255,255,0.85);")
+        self.lbl_web_folder.setStyleSheet(theme.BODY_TEXT_STYLE)
         
         self.web_folder_edit = QLineEdit()
         self.web_folder_edit.setPlaceholderText("Default Downloads folder...")
@@ -173,6 +128,12 @@ class GeneralPage(QWidget):
         self.chk_keep_web_originals = QCheckBox("Keep original downloaded files\nwhen dropping URLs")
         self.chk_keep_web_originals.setStyleSheet(CHECKBOX_STYLE)
         inner_web.addWidget(self.chk_keep_web_originals)
+        web_hint = QLabel(
+            "Use this if dropped URLs should leave the original download intact and create a second optimized or converted file."
+        )
+        web_hint.setWordWrap(True)
+        web_hint.setStyleSheet(theme.HINT_STYLE)
+        inner_web.addWidget(web_hint)
 
         layout.addWidget(sec_web)
 
@@ -189,11 +150,26 @@ class GeneralPage(QWidget):
         self.chk_login.setStyleSheet(CHECKBOX_STYLE)
         self.chk_tray = QCheckBox("Show in system tray")
         self.chk_tray.setStyleSheet(CHECKBOX_STYLE)
+        self.chk_auto_update = QCheckBox("Install updates automatically")
+        self.chk_auto_update.setStyleSheet(CHECKBOX_STYLE)
 
         inner2.addWidget(self.chk_preserve_dates)
         inner2.addWidget(self.chk_auto_copy)
         inner2.addWidget(self.chk_login)
         inner2.addWidget(self.chk_tray)
+        inner2.addWidget(self.chk_auto_update)
+        behavior_hint = QLabel(
+            "If the tray is hidden, keep the floating dropzone enabled or rely on the toggle shortcut for access."
+        )
+        behavior_hint.setWordWrap(True)
+        behavior_hint.setStyleSheet(theme.HINT_STYLE)
+        inner2.addWidget(behavior_hint)
+        update_hint = QLabel(
+            "Automatic updates are enabled by default. When turned on, Clyro downloads and installs the latest release in the background."
+        )
+        update_hint.setWordWrap(True)
+        update_hint.setStyleSheet(theme.HINT_STYLE)
+        inner2.addWidget(update_hint)
         layout.addWidget(sec2)
 
         # ── Auto Convert ──────────────────────────────────────────────
@@ -223,50 +199,22 @@ class GeneralPage(QWidget):
             "pdf":  ["jpg", "png"],
         }
 
-        COMBO_STYLE = """
-            QComboBox {
-                background: rgba(255,255,255,0.06);
-                border: 1px solid rgba(255,255,255,0.12);
-                border-radius: 6px; padding: 5px 10px;
-                font-size: 12px; color: rgba(255,255,255,0.85);
-                min-width: 90px;
-            }
-            QComboBox:hover { border-color: rgba(255,255,255,0.25); }
-            QComboBox::drop-down {
-                border: none; width: 20px;
-                subcontrol-position: right center;
-            }
-            QComboBox::down-arrow {
-                image: none; border: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 5px solid rgba(255,255,255,0.5);
-                width: 0; height: 0;
-            }
-            QComboBox QAbstractItemView {
-                background: #2A2A2A; border: 1px solid rgba(255,255,255,0.15);
-                border-radius: 6px; color: rgba(255,255,255,0.85);
-                selection-background-color: rgba(255,255,255,0.12);
-                padding: 4px;
-            }
-        """
-
         from_to_row = QHBoxLayout()
         from_to_row.setSpacing(8)
         lbl_from = QLabel("From")
-        lbl_from.setStyleSheet("font-size: 13px; color: rgba(255,255,255,0.65);")
+        lbl_from.setStyleSheet(theme.BODY_TEXT_STYLE)
         self.combo_ac_from = QComboBox()
         self.combo_ac_from.setStyleSheet(COMBO_STYLE)
         for fmt in sorted(self._convert_map.keys()):
             self.combo_ac_from.addItem(fmt.upper(), fmt)
 
         lbl_arrow = QLabel("→")
-        lbl_arrow.setStyleSheet("font-size: 16px; font-weight: 700; color: rgba(255,255,255,0.35);")
+        lbl_arrow.setStyleSheet(f"font-size: 16px; font-weight: 700; color: {theme.TEXT_MUTED};")
         lbl_arrow.setFixedWidth(20)
         lbl_arrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         lbl_to = QLabel("To")
-        lbl_to.setStyleSheet("font-size: 13px; color: rgba(255,255,255,0.65);")
+        lbl_to.setStyleSheet(theme.BODY_TEXT_STYLE)
         self.combo_ac_to = QComboBox()
         self.combo_ac_to.setStyleSheet(COMBO_STYLE)
 
@@ -359,6 +307,7 @@ class GeneralPage(QWidget):
         self.chk_auto_copy.setChecked(getattr(self.settings, 'auto_copy_to_clipboard', False))
         self.chk_login.setChecked(self.settings.start_on_login)
         self.chk_tray.setChecked(self.settings.show_tray)
+        self.chk_auto_update.setChecked(getattr(self.settings, 'auto_update_enabled', True))
 
         # Auto-convert
         ac_on = getattr(self.settings, 'auto_convert_enabled', False)
@@ -394,6 +343,7 @@ class GeneralPage(QWidget):
         self.settings.auto_copy_to_clipboard = self.chk_auto_copy.isChecked()
         self.settings.start_on_login = self.chk_login.isChecked()
         self.settings.show_tray = self.chk_tray.isChecked()
+        self.settings.auto_update_enabled = self.chk_auto_update.isChecked()
 
         # Auto-convert
         self.settings.auto_convert_enabled = self.chk_auto_convert.isChecked()

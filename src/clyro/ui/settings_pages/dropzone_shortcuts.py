@@ -1,46 +1,11 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QFrame
 )
+from clyro.ui import settings_theme as theme
 
-LABEL_STYLE = "font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.45); letter-spacing: 0.8px;"
-SECTION_STYLE = """
-    QFrame#section {
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.07);
-        border-radius: 10px;
-    }
-"""
-CHECKBOX_STYLE = """
-    QCheckBox {
-        font-size: 13px; color: rgba(255,255,255,0.85); spacing: 10px; padding: 2px 0;
-    }
-    QCheckBox::indicator {
-        width: 18px; height: 18px; border-radius: 4px;
-        border: 1.5px solid rgba(255,255,255,0.25); background: transparent;
-    }
-    QCheckBox::indicator:hover {
-        border: 1.5px solid rgba(255,255,255,0.5);
-    }
-    QCheckBox::indicator:checked {
-        border: 1.5px solid #FFFFFF; background: #FFFFFF;
-        image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMjIyMjIyIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMjAgNiA5IDE3IDQgMTIiPjwvcG9seWxpbmU+PC9zdmc+");
-    }
-"""
-INPUT_STYLE = """
-    QLineEdit {
-        background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(255,255,255,0.12);
-        border-radius: 6px;
-        padding: 5px 10px;
-        font-size: 12px;
-        color: rgba(255,255,255,0.75);
-        font-family: 'SF Mono', Consolas, Menlo, monospace;
-    }
-    QLineEdit:focus {
-        border-color: rgba(255,255,255,0.3);
-        background: rgba(255,255,255,0.08);
-    }
-"""
+LABEL_STYLE = theme.LABEL_STYLE
+SECTION_STYLE = theme.SECTION_STYLE
+CHECKBOX_STYLE = theme.CHECKBOX_STYLE
 
 def _section(title: str) -> tuple[QFrame, QVBoxLayout]:
     frame = QFrame()
@@ -63,7 +28,9 @@ class DropzoneShortcutsPage(QWidget):
     def __init__(self, settings):
         super().__init__()
         self.settings = settings
-        self.setStyleSheet("background: transparent;")
+        self.setStyleSheet(
+            f"background: transparent; color: {theme.TEXT_PRIMARY}; font-family: {theme.FONT_STACK};"
+        )
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -72,20 +39,33 @@ class DropzoneShortcutsPage(QWidget):
         # ── Dropzone Behavior ─────────────────────────────────────────
         sec, inner = _section("Dropzone")
 
-        self.chk_enabled = QCheckBox("Show dropzone when dragging files")
+        self.chk_enabled = QCheckBox("Keep floating dropzone available")
         self.chk_enabled.setStyleSheet(CHECKBOX_STYLE)
-        self.chk_require_alt = QCheckBox("Require Alt key to show dropzone")
+        self.chk_require_alt = QCheckBox("Require Alt before accepting drops")
         self.chk_require_alt.setStyleSheet(CHECKBOX_STYLE)
+        self.chk_enabled.toggled.connect(lambda _: self._update_summary())
+        self.chk_require_alt.toggled.connect(lambda _: self._update_summary())
 
         inner.addWidget(self.chk_enabled)
         inner.addWidget(self.chk_require_alt)
+        hint = QLabel(
+            "This controls the floating dropzone itself. It does not enable automatic drag-triggered reveal from anywhere on screen."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet(theme.HINT_STYLE)
+        inner.addWidget(hint)
+
+        self.lbl_access_summary = QLabel("")
+        self.lbl_access_summary.setWordWrap(True)
+        self.lbl_access_summary.setStyleSheet(theme.VALUE_STYLE)
+        inner.addWidget(self.lbl_access_summary)
         layout.addWidget(sec)
 
         # ── Drop Modes Reference Card ─────────────────────────────────
         sec2, inner2 = _section("Drop Modes")
 
         ref = QLabel(
-            "<span style='color: rgba(255,255,255,0.5);'>These are fixed by design and not configurable:</span>"
+            f"<span style='color: {theme.TEXT_MUTED};'>These are fixed by design and not configurable:</span>"
         )
         ref.setWordWrap(True)
         ref.setStyleSheet("font-size: 12px;")
@@ -101,13 +81,14 @@ class DropzoneShortcutsPage(QWidget):
             row.setSpacing(0)
             key_lbl = QLabel(key)
             key_lbl.setStyleSheet(
-                "font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.7); "
-                "font-family: 'SF Mono', Consolas, monospace; min-width: 130px;"
+                f"font-size: 12px; font-weight: 700; color: {theme.ACCENT}; min-width: 130px;"
             )
             arrow = QLabel("→")
-            arrow.setStyleSheet("font-size: 12px; color: rgba(255,255,255,0.25); margin: 0 10px;")
+            arrow.setStyleSheet(
+                f"font-size: 12px; color: {theme.TEXT_MUTED}; margin: 0 10px;"
+            )
             desc_lbl = QLabel(desc)
-            desc_lbl.setStyleSheet("font-size: 12px; color: rgba(255,255,255,0.5);")
+            desc_lbl.setStyleSheet(theme.VALUE_STYLE)
             row.addWidget(key_lbl)
             row.addWidget(arrow)
             row.addWidget(desc_lbl)
@@ -122,7 +103,19 @@ class DropzoneShortcutsPage(QWidget):
     def load_settings(self):
         self.chk_enabled.setChecked(self.settings.dropzone_enabled)
         self.chk_require_alt.setChecked(self.settings.dropzone_require_alt)
+        self._update_summary()
 
     def save_settings(self):
         self.settings.dropzone_enabled = self.chk_enabled.isChecked()
         self.settings.dropzone_require_alt = self.chk_require_alt.isChecked()
+        self._update_summary()
+
+    def _update_summary(self):
+        access = "floating dropzone"
+        if getattr(self.settings, "show_tray", True):
+            access += " + tray"
+        if self.chk_require_alt.isChecked():
+            access += "  ·  Alt required before dropping"
+        shortcut = getattr(self.settings, "shortcut_toggle_dropzone", "Ctrl+Alt+D")
+        access += f"  ·  Toggle shortcut: {shortcut}"
+        self.lbl_access_summary.setText(f"Current saved access path: {access}")

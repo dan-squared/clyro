@@ -5,59 +5,13 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from clyro.config.presets import QUALITY_PRESETS
+from clyro.ui import settings_theme as theme
 
-LABEL_STYLE = "font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.45); letter-spacing: 0.8px;"
-SECTION_STYLE = """
-    QFrame#section {
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.07);
-        border-radius: 10px;
-    }
-"""
-CHECKBOX_STYLE = """
-    QCheckBox {
-        font-size: 13px; color: rgba(255,255,255,0.85); spacing: 10px; padding: 2px 0;
-    }
-    QCheckBox::indicator {
-        width: 18px; height: 18px; border-radius: 4px;
-        border: 1.5px solid rgba(255,255,255,0.25); background: transparent;
-    }
-    QCheckBox::indicator:hover {
-        border: 1.5px solid rgba(255,255,255,0.5);
-    }
-    QCheckBox::indicator:checked {
-        border: 1.5px solid #FFFFFF; background: #FFFFFF;
-        image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMjIyMjIyIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMjAgNiA5IDE3IDQgMTIiPjwvcG9seWxpbmU+PC9zdmc+");
-    }
-"""
-RADIO_STYLE = """
-    QRadioButton {
-        font-size: 13px; color: rgba(255,255,255,0.85); spacing: 10px; padding: 2px 0;
-    }
-    QRadioButton::indicator {
-        width: 16px; height: 16px; border-radius: 8px;
-        border: 1.5px solid rgba(255,255,255,0.25); background: transparent;
-    }
-    QRadioButton::indicator:hover {
-        border: 1.5px solid rgba(255,255,255,0.5);
-    }
-    QRadioButton::indicator:checked {
-        border: 4px solid rgba(255,255,255,0.15); background: #FFFFFF;
-    }
-"""
-SLIDER_STYLE = """
-    QSlider::groove:horizontal {
-        height: 4px; background: rgba(255,255,255,0.12); border-radius: 2px;
-    }
-    QSlider::handle:horizontal {
-        width: 14px; height: 14px; margin: -5px 0;
-        border-radius: 7px; background: rgba(255,255,255,0.85);
-        border: none;
-    }
-    QSlider::sub-page:horizontal {
-        background: rgba(255,255,255,0.6); border-radius: 2px;
-    }
-"""
+LABEL_STYLE = theme.LABEL_STYLE
+SECTION_STYLE = theme.SECTION_STYLE
+CHECKBOX_STYLE = theme.CHECKBOX_STYLE
+RADIO_STYLE = theme.RADIO_STYLE
+SLIDER_STYLE = theme.SLIDER_STYLE
 
 def _section(title: str) -> tuple[QFrame, QVBoxLayout]:
     frame = QFrame()
@@ -79,48 +33,17 @@ def _section(title: str) -> tuple[QFrame, QVBoxLayout]:
 def _spinbox_row(label: str, min_val: int, max_val: int, suffix: str = "") -> tuple[QHBoxLayout, QSpinBox]:
     row = QHBoxLayout()
     lbl = QLabel(label)
-    lbl.setStyleSheet("font-size: 13px; color: rgba(255,255,255,0.75);")
+    lbl.setStyleSheet(theme.BODY_TEXT_STYLE)
     lbl.setFixedWidth(140)
     
     sb = QSpinBox()
     sb.setRange(min_val, max_val)
     sb.setSuffix(suffix)
-    sb.setStyleSheet("""
-        QSpinBox {
-            background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 6px;
-            padding: 4px 28px 4px 10px;
-            font-size: 12px; color: rgba(255,255,255,0.85);
-        }
-        QSpinBox::up-button, QSpinBox::down-button {
-            width: 20px;
-            background: rgba(255,255,255,0.06);
-            border: none;
-            border-left: 1px solid rgba(255,255,255,0.08);
-        }
-        QSpinBox::up-button { border-top-right-radius: 6px; }
-        QSpinBox::down-button { border-bottom-right-radius: 6px; }
-        QSpinBox::up-button:hover, QSpinBox::down-button:hover {
-            background: rgba(255,255,255,0.12);
-        }
-        QSpinBox::up-arrow {
-            image: none; border: none;
-            border-left: 4px solid transparent; border-right: 4px solid transparent;
-            border-bottom: 5px solid rgba(255,255,255,0.5);
-            width: 0; height: 0;
-        }
-        QSpinBox::down-arrow {
-            image: none; border: none;
-            border-left: 4px solid transparent; border-right: 4px solid transparent;
-            border-top: 5px solid rgba(255,255,255,0.5);
-            width: 0; height: 0;
-        }
-    """)
+    sb.setStyleSheet(theme.SPINBOX_STYLE)
     sb.setFixedWidth(110)
     
     info_lbl = QLabel("(0 to disable)")
-    info_lbl.setStyleSheet("font-size: 11px; color: rgba(255,255,255,0.3);")
+    info_lbl.setStyleSheet(theme.HINT_STYLE)
     
     row.addWidget(lbl)
     row.addWidget(sb)
@@ -131,13 +54,15 @@ def _spinbox_row(label: str, min_val: int, max_val: int, suffix: str = "") -> tu
 def _slider_row(label: str, lo: int, hi: int) -> tuple[QHBoxLayout, QSlider, QLabel]:
     row = QHBoxLayout()
     lbl = QLabel(label)
-    lbl.setStyleSheet("font-size: 13px; color: rgba(255,255,255,0.75);")
+    lbl.setStyleSheet(theme.BODY_TEXT_STYLE)
     lbl.setFixedWidth(140)
     sl = QSlider(Qt.Orientation.Horizontal)
     sl.setRange(lo, hi)
     sl.setStyleSheet(SLIDER_STYLE)
     val_lbl = QLabel(str(sl.value()))
-    val_lbl.setStyleSheet("font-size: 12px; color: rgba(255,255,255,0.5); font-family: monospace; min-width: 28px;")
+    val_lbl.setStyleSheet(
+        f"font-size: 12px; color: {theme.TEXT_MUTED}; min-width: 28px; font-family: {theme.NUMERIC_FONT_STACK};"
+    )
     val_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
     sl.valueChanged.connect(lambda v: val_lbl.setText(str(v)))
     row.addWidget(lbl)
@@ -149,7 +74,9 @@ class QualityPage(QWidget):
     def __init__(self, settings):
         super().__init__()
         self.settings = settings
-        self.setStyleSheet("background: transparent;")
+        self.setStyleSheet(
+            f"background: transparent; color: {theme.TEXT_PRIMARY}; font-family: {theme.FONT_STACK};"
+        )
         self._block = False
 
         layout = QVBoxLayout(self)
@@ -165,27 +92,37 @@ class QualityPage(QWidget):
         for name in ["Balanced", "Max"]:
             btn = QPushButton(name)
             btn.setCheckable(True)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background: rgba(255,255,255,0.06);
-                    border: 1px solid rgba(255,255,255,0.12);
-                    border-radius: 7px; padding: 6px 20px;
-                    font-size: 12px; font-weight: 600;
-                    color: rgba(255,255,255,0.6);
-                }
-                QPushButton:checked {
-                    background: rgba(255,255,255,0.14);
-                    border-color: rgba(255,255,255,0.35);
-                    color: rgba(255,255,255,0.95);
-                }
-                QPushButton:hover:!checked { background: rgba(255,255,255,0.09); }
-            """)
+            btn.setStyleSheet(
+                f"""
+                QPushButton {{
+                    background: {theme.SURFACE_ALT};
+                    border: 1px solid {theme.BORDER};
+                    border-radius: 8px;
+                    padding: 7px 20px;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: {theme.TEXT_SECONDARY};
+                    font-family: {theme.FONT_STACK};
+                }}
+                QPushButton:checked {{
+                    background: {theme.ACCENT};
+                    border-color: {theme.ACCENT};
+                    color: {theme.SURFACE_BG};
+                }}
+                QPushButton:hover:!checked {{
+                    background: #ede1d0;
+                    border-color: {theme.BORDER_STRONG};
+                }}
+                """
+            )
             btn.clicked.connect(lambda _, n=name.lower(): self._apply_preset(n))
             self.preset_btns[name.lower()] = btn
             preset_row.addWidget(btn)
 
         self.preset_desc = QLabel("")
-        self.preset_desc.setStyleSheet("font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px;")
+        self.preset_desc.setStyleSheet(
+            f"font-size: 12px; color: {theme.TEXT_MUTED}; margin-top: 2px;"
+        )
         self.preset_desc.setWordWrap(True)
 
         inner.addLayout(preset_row)
@@ -211,6 +148,12 @@ class QualityPage(QWidget):
         inner2.addLayout(jpg_row)
         inner2.addLayout(webp_row)
         inner2.addWidget(self.chk_meta)
+        img_hint = QLabel(
+            "Turning metadata preservation off removes EXIF and location data, which can improve privacy and reduce size."
+        )
+        img_hint.setWordWrap(True)
+        img_hint.setStyleSheet(theme.HINT_STYLE)
+        inner2.addWidget(img_hint)
         layout.addWidget(sec2)
 
         # ── Video ─────────────────────────────────────────────────────
@@ -227,6 +170,10 @@ class QualityPage(QWidget):
         inner3.addLayout(size_vid_row)
         inner3.addLayout(crf_row)
         inner3.addWidget(self.chk_no_audio)
+        vid_hint = QLabel("Lower CRF keeps more quality but produces larger files. Removing audio is irreversible.")
+        vid_hint.setWordWrap(True)
+        vid_hint.setStyleSheet(theme.HINT_STYLE)
+        inner3.addWidget(vid_hint)
         layout.addWidget(sec3)
 
         # ── PDF ───────────────────────────────────────────────────────
@@ -247,7 +194,7 @@ class QualityPage(QWidget):
         # ── Merge sort order ──
         divider_pdf = QFrame()
         divider_pdf.setFrameShape(QFrame.Shape.HLine)
-        divider_pdf.setStyleSheet("color: rgba(255,255,255,0.07);")
+        divider_pdf.setStyleSheet(theme.DIVIDER_STYLE)
         inner4.addWidget(divider_pdf)
 
         merge_lbl = QLabel("MERGE SORT ORDER")
@@ -257,36 +204,9 @@ class QualityPage(QWidget):
         merge_row = QHBoxLayout()
         merge_row.setSpacing(8)
         merge_desc = QLabel("Sort images before merging to PDF:")
-        merge_desc.setStyleSheet("font-size: 13px; color: rgba(255,255,255,0.75);")
-        COMBO_STYLE = """
-            QComboBox {
-                background: rgba(255,255,255,0.06);
-                border: 1px solid rgba(255,255,255,0.12);
-                border-radius: 6px; padding: 5px 10px;
-                font-size: 12px; color: rgba(255,255,255,0.85);
-                min-width: 130px;
-            }
-            QComboBox:hover { border-color: rgba(255,255,255,0.25); }
-            QComboBox::drop-down {
-                border: none; width: 20px;
-                subcontrol-position: right center;
-            }
-            QComboBox::down-arrow {
-                image: none; border: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 5px solid rgba(255,255,255,0.5);
-                width: 0; height: 0;
-            }
-            QComboBox QAbstractItemView {
-                background: #2A2A2A; border: 1px solid rgba(255,255,255,0.15);
-                border-radius: 6px; color: rgba(255,255,255,0.85);
-                selection-background-color: rgba(255,255,255,0.12);
-                padding: 4px;
-            }
-        """
+        merge_desc.setStyleSheet(theme.BODY_TEXT_STYLE)
         self.combo_merge_sort = QComboBox()
-        self.combo_merge_sort.setStyleSheet(COMBO_STYLE)
+        self.combo_merge_sort.setStyleSheet(theme.COMBO_STYLE)
         self.combo_merge_sort.addItem("Drop order", "none")
         self.combo_merge_sort.addItem("Name (A → Z)", "name_asc")
         self.combo_merge_sort.addItem("Name (Z → A)", "name_desc")
@@ -296,6 +216,12 @@ class QualityPage(QWidget):
         merge_row.addWidget(self.combo_merge_sort)
         merge_row.addStretch()
         inner4.addLayout(merge_row)
+        pdf_hint = QLabel(
+            "Aggressive PDF compression saves more space but may reduce fidelity. Merge sorting changes the output page order."
+        )
+        pdf_hint.setWordWrap(True)
+        pdf_hint.setStyleSheet(theme.HINT_STYLE)
+        inner4.addWidget(pdf_hint)
 
         layout.addWidget(sec4)
 

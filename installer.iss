@@ -3,10 +3,13 @@
 ; Users just double-click and use — no extra installs needed.
 
 #define MyAppName      "Clyro"
-#define MyAppVersion   "0.1.2"
 #define MyAppPublisher "Clyro"
 #define MyAppExeName   "Clyro.exe"
 #define MyAppDir       "dist\Clyro"
+
+#ifndef MyAppVersion
+  #error MyAppVersion must be provided by build_release.py
+#endif
 
 [Setup]
 AppId={{B4C7E2D1-3F9A-4B2C-9D5E-1A2B3C4D5E6F}}

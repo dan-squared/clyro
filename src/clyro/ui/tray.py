@@ -17,6 +17,10 @@ class TrayIcon(QSystemTrayIcon):
         act_settings = QAction("Settings", self)
         act_settings.triggered.connect(self.app_manager.show_settings)
         menu.addAction(act_settings)
+
+        act_updates = QAction("Check for Updates", self)
+        act_updates.triggered.connect(self.app_manager.request_manual_update_check)
+        menu.addAction(act_updates)
         
         menu.addSeparator()
         

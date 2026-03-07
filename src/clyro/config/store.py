@@ -13,6 +13,7 @@ def _coerce_settings(s: Settings) -> Settings:
     s.image_webp_quality   = max(1,  min(100, int(s.image_webp_quality)))
     s.image_png_min_quality = max(1, min(100, int(s.image_png_min_quality)))  # correct field name
     s.video_crf            = max(0,  min(51,  int(s.video_crf)))
+    s.schema_version = Settings().schema_version
     return s
 
 class SettingsStore:

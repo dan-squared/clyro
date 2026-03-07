@@ -2,6 +2,8 @@ import subprocess
 import logging
 import re
 import time
+import threading
+import queue
 from pathlib import Path
 from clyro.core.types import Result
 from clyro.errors import ToolExecutionError
@@ -167,18 +169,30 @@ class PdfHandler:
         try:
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, creationflags=subprocess.CREATE_NO_WINDOW, bufsize=1, universal_newlines=True)
             
+            # Non-blocking read using a background thread and a Queue
+            q = queue.Queue()
+            def enqueue_output(out, queue):
+                try:
+                    for line in iter(out.readline, ''):
+                        queue.put(line)
+                finally:
+                    out.close()
+
+            t = threading.Thread(target=enqueue_output, args=(process.stdout, q), daemon=True)
+            t.start()
+
             while True:
-                if job.is_cancelled:
+                if job and job.is_cancelled:
                     process.kill()
                     process.wait()
                     out_path.unlink(missing_ok=True)
                     return None
                 
-                line = process.stdout.readline()
-                if not line:
+                try:
+                    line = q.get(timeout=0.1)
+                except queue.Empty:
                     if process.poll() is not None:
                         break
-                    time.sleep(0.01)
                     continue
 
                 match = page_regex.search(line)
@@ -200,10 +214,17 @@ class PdfHandler:
         opt_size = out_path.stat().st_size
         if opt_size >= orig_size and self.settings.skip_if_larger and out_path != source:
             out_path.unlink(missing_ok=True)
-            return Result(source, source, orig_size, orig_size)
+            return Result(
+                source,
+                source,
+                orig_size,
+                opt_size,
+                outcome="skipped_larger",
+                detail="Kept the original because the optimized PDF was larger.",
+            )
             
         signals.progress.emit(job.id, (100.0, "Complete"))
-        return Result(source, out_path, orig_size, opt_size)
+        return Result(source, out_path, orig_size, opt_size, outcome="optimized")
 
     def _get_page_count(self, source: Path) -> int:
         try:
@@ -241,7 +262,7 @@ class PdfToImageHandler:
             raise ToolExecutionError(f"PyMuPDF failed to convert PDF to image: {e}")
             
         signals.progress.emit(job.id, (100, "Done"))
-        return Result(source, out_path, orig_size, out_path.stat().st_size)
+        return Result(source, out_path, orig_size, out_path.stat().st_size, outcome="converted")
 
 class PdfToWordHandler:
     def __init__(self, tools):
@@ -314,4 +335,4 @@ class PdfToWordHandler:
             raise ToolExecutionError(f"pdf2docx failed: {e}")
             
         signals.progress.emit(job.id, (100.0, "Complete"))
-        return Result(source, out_path, orig_size, out_path.stat().st_size)
+        return Result(source, out_path, orig_size, out_path.stat().st_size, outcome="converted")

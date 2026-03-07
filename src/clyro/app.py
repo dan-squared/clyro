@@ -4,10 +4,12 @@ import atexit
 import os
 import glob
 import time
-from PyQt6.QtWidgets import QApplication
+import webbrowser
+from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
+from clyro import __version__
 # Lightweight config — no heavy deps
 from clyro.config.store import SettingsStore
 from clyro.ui.dropzone import DropzoneWindow
@@ -21,8 +23,14 @@ from clyro.ui.theme import Theme
 
 logger = logging.getLogger(__name__)
 
-class AppManager:
+class AppManager(QObject):
+    update_check_completed = pyqtSignal(object, bool)
+    update_check_failed = pyqtSignal(str, bool)
+    update_install_failed = pyqtSignal(str, bool)
+    update_download_ready = pyqtSignal(object, str, bool)
+
     def __init__(self, app: QApplication, icon: QIcon | None = None):
+        super().__init__()
         self.app = app
         app.setStyleSheet(Theme.STYLE_SHEET)
         
@@ -37,6 +45,16 @@ class AppManager:
         self._handlers_ready = False
         self.ipc = None
         self.settings_window = None
+        self._update_check_in_flight = False
+        self._update_install_in_flight = False
+        self._last_update_info: dict | None = None
+        self._pending_update_info: dict | None = None
+        self._pending_update_installer: str | None = None
+        self._install_update_on_quit = False
+        self.update_check_completed.connect(self._handle_update_check_result)
+        self.update_check_failed.connect(self._handle_update_check_error)
+        self.update_install_failed.connect(self._handle_update_install_error)
+        self.update_download_ready.connect(self._handle_update_download_ready)
         
         # Build & show UI immediately (uses only PyQt6 — no heavy deps)
         self.dropzone = DropzoneWindow(None, self.settings)  # queue_service=None for now
@@ -50,11 +68,7 @@ class AppManager:
         # Tray icon (lightweight)
         app_icon = icon or QIcon()
         self.tray = TrayIcon(self, app_icon)
-        if self.settings.show_tray:
-            self.tray.show()
-            
-        # Show the window NOW — user sees it in <500ms
-        self.dropzone.show()
+        self._apply_surface_visibility()
         
         # ── Phase 2: Deferred — heavy init after event loop starts ────
         # QTimer.singleShot(0) runs immediately after the event loop
@@ -120,20 +134,45 @@ class AppManager:
         if self.dropzone.isVisible():
             self.dropzone.hide()
         else:
-            self.dropzone.show()
-            self.dropzone.activateWindow()
+            self.dropzone.reveal()
             
     def show_dropzone(self):
-        self.dropzone.show()
-        self.dropzone.activateWindow()
+        self.dropzone.reveal()
         
     def show_settings(self):
         self._ensure_handlers()  # need tools for settings page
         if not self.settings_window:
             from clyro.ui.settings_window import SettingsWindow
-            self.settings_window = SettingsWindow(self.settings, self.store, self.tools)
+            self.settings_window = SettingsWindow(self.settings, self.store, self.tools, self)
             # Re-read settings instance changes when closed
             self.settings_window.settings_saved.connect(self._on_settings_saved)
+
+        if (
+            self._last_update_info
+            and not self.settings.auto_update_enabled
+            and self.settings.skipped_update_version == self._last_update_info.get("version")
+        ):
+            self.settings_window.set_update_action(visible=False)
+        elif self._pending_update_installer and self._pending_update_info:
+            self.settings_window.set_update_status(
+                f"Version {self._pending_update_info['version']} is ready to install.",
+                "success",
+            )
+            self.settings_window.set_update_action("Install Now", enabled=True, visible=True)
+        elif self._update_install_in_flight and self._last_update_info:
+            self.settings_window.set_update_status(
+                f"Downloading update {self._last_update_info['version']}...",
+                "warning",
+            )
+            self.settings_window.set_update_action("Downloading...", enabled=False, visible=True)
+        elif self._last_update_info:
+            self.settings_window.set_update_status(
+                f"Version {self._last_update_info['version']} is available.",
+                "warning",
+            )
+            self.settings_window.set_update_action("Update Now", enabled=True, visible=True)
+        else:
+            self.settings_window.set_update_action(visible=False)
             
         self.settings_window.show()
         self.settings_window.activateWindow()
@@ -150,7 +189,7 @@ class AppManager:
         ih = ImageHandler(self.settings, self.tools)
         vh = VideoHandler(self.settings, self.tools)
         ph = PdfHandler(self.settings, self.tools)
-        i_i = ImageToImageHandler(self.tools)
+        i_i = ImageToImageHandler(self.settings, self.tools)
         i_p = ImageToPdfHandler(self.tools)
         v_v = VideoToVideoHandler(self.tools)
         v_i = VideoToImageHandler(self.tools)
@@ -173,10 +212,24 @@ class AppManager:
         self.settings = self.store.load()
         self._build_handlers()
         self._apply_startup_registry(self.settings.start_on_login)
-        if self.settings.show_tray and not self.tray.isVisible():
+        self._apply_surface_visibility()
+        if self.settings_window:
+            self.settings_window.refresh_status()
+
+    def _apply_surface_visibility(self):
+        # Never allow the app to hide both its tray surface and dropzone.
+        show_tray = self.settings.show_tray
+        show_dropzone = self.settings.dropzone_enabled or not show_tray
+
+        if show_tray and not self.tray.isVisible():
             self.tray.show()
-        elif not self.settings.show_tray and self.tray.isVisible():
+        elif not show_tray and self.tray.isVisible():
             self.tray.hide()
+
+        if show_dropzone:
+            self.dropzone.show()
+        else:
+            self.dropzone.hide()
 
     def _apply_startup_registry(self, enabled: bool):
         """Write/remove Clyro from the Windows HKCU Run registry key."""
@@ -211,6 +264,8 @@ class AppManager:
         if missing and self.tray.isVisible():
             msg = "Missing tools: " + ", ".join(missing)
             self.tray.showMessage("Clyro \u2014 Tools Missing", msg, msecs=6000)
+        if self.settings_window:
+            self.settings_window.refresh_status()
             
     def _cleanup_temp_files(self):
         """Delete stale Clyro temp files older than 1 hour."""
@@ -263,31 +318,256 @@ class AppManager:
         except Exception:
             pass  # process already gone
 
-    def _check_for_updates(self):
+    def request_manual_update_check(self):
+        self._check_for_updates(manual=True)
+
+    def trigger_update_now(self):
+        if self._pending_update_installer:
+            self._install_pending_update(now=True)
+            return
+
+        if self._last_update_info and self._last_update_info.get("download_url"):
+            self._start_update_download(self._last_update_info, manual=True)
+            return
+
+        if self._last_update_info and self._last_update_info.get("release_url"):
+            webbrowser.open(self._last_update_info["release_url"])
+
+    def _set_update_status_text(self, message: str, tone: str = "muted"):
+        if self.settings_window:
+            self.settings_window.set_update_status(message, tone)
+
+    def _set_update_action(self, label: str | None = None, *, enabled: bool = True, visible: bool = True):
+        if self.settings_window:
+            self.settings_window.set_update_action(label, enabled=enabled, visible=visible)
+
+    def _check_for_updates(self, manual: bool = False):
         """Spawns an async task to check for updates using the background thread."""
+        if self._update_check_in_flight:
+            if manual:
+                self._set_update_status_text("Already checking for updates…", "muted")
+            return
+
         try:
             import asyncio
+            import threading
             from clyro.updater import AutoUpdater
-            
-            # Note: We hardcode version to match pyproject.toml "0.1.0"
-            updater = AutoUpdater(current_version="0.1.0")
-            
+
+            self._update_check_in_flight = True
+            self._set_update_status_text("Checking for updates…", "muted")
+            updater = AutoUpdater(current_version=__version__)
+
             def _run_updater():
                 loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                update_info = loop.run_until_complete(updater.check_for_updates())
-                if update_info:
-                    logger.info(f"Update available to {update_info['version']}. Downloading...")
-                    loop.run_until_complete(updater.download_and_install(update_info["download_url"]))
-                loop.close()
+                try:
+                    asyncio.set_event_loop(loop)
+                    update_info = loop.run_until_complete(updater.check_for_updates())
+                    self.update_check_completed.emit(update_info, manual)
+                except Exception as exc:
+                    self.update_check_failed.emit(str(exc), manual)
+                finally:
+                    loop.close()
 
-            import threading
             t = threading.Thread(target=_run_updater, daemon=True)
             t.start()
         except Exception as e:
+            self._update_check_in_flight = False
             logger.error(f"Updater failure: {e}")
+            if manual:
+                QMessageBox.warning(self.settings_window or self.dropzone, "Clyro", f"Update check failed.\n\n{e}")
+
+    def _handle_update_check_result(self, update_info, manual: bool):
+        self._update_check_in_flight = False
+        self._last_update_info = update_info
+
+        if not update_info:
+            self._set_update_status_text("You are up to date.", "success")
+            self._set_update_action(visible=False)
+            if manual:
+                QMessageBox.information(self.settings_window or self.dropzone, "Clyro", "You are already on the latest version.")
+            return
+
+        version = update_info["version"]
+        self._set_update_status_text(f"Version {version} is available.", "warning")
+        self._set_update_action("Update Now", enabled=True, visible=True)
+
+        if not manual and not self.settings.auto_update_enabled and self.settings.skipped_update_version == version:
+            logger.info("Update %s was skipped previously; suppressing automatic dialog.", version)
+            self._set_update_action(visible=False)
+            return
+
+        if self._pending_update_info and self._pending_update_info.get("version") == version and self._pending_update_installer:
+            self._set_update_status_text(f"Version {version} is ready to install.", "success")
+            self._set_update_action("Install Now", enabled=True, visible=True)
+            if not manual and self.settings.auto_update_enabled:
+                self._prompt_update_ready(update_info)
+            return
+
+        if self.settings.auto_update_enabled and not manual and update_info.get("download_url"):
+            logger.info("Update available to %s. Starting background download.", version)
+            self._start_update_download(update_info, manual=False)
+            return
+
+        logger.info("Update available to %s. Waiting for user action.", version)
+        self._show_update_dialog(update_info, manual=manual)
+
+    def _handle_update_check_error(self, message: str, manual: bool):
+        self._update_check_in_flight = False
+        logger.error("Updater failure: %s", message)
+        self._set_update_status_text("Update check failed.", "error")
+        if manual:
+            QMessageBox.warning(self.settings_window or self.dropzone, "Clyro", f"Update check failed.\n\n{message}")
+
+    def _start_update_download(self, update_info: dict, manual: bool):
+        if self._update_install_in_flight:
+            self._set_update_action("Downloading...", enabled=False, visible=True)
+            if manual:
+                QMessageBox.information(self.settings_window or self.dropzone, "Clyro", "An update download is already in progress.")
+            return
+
+        try:
+            import asyncio
+            import threading
+            from clyro.updater import AutoUpdater
+
+            self._update_install_in_flight = True
+            self.settings.skipped_update_version = None
+            self.store.save(self.settings)
+            self._set_update_action("Downloading...", enabled=False, visible=True)
+
+            version = update_info["version"]
+            if update_info.get("sha256"):
+                self._set_update_status_text(f"Downloading update {version}...", "warning")
+            else:
+                self._set_update_status_text(f"Downloading update {version} without published checksum...", "warning")
+
+            if self.tray.isVisible():
+                self.tray.showMessage("Clyro update", f"Downloading version {version}.", msecs=5000)
+
+            updater = AutoUpdater(current_version=__version__)
+
+            def _run_download():
+                loop = asyncio.new_event_loop()
+                try:
+                    asyncio.set_event_loop(loop)
+                    installer_path = loop.run_until_complete(
+                        updater.download_installer(
+                            update_info["download_url"],
+                            update_info.get("sha256"),
+                        )
+                    )
+                    self.update_download_ready.emit(update_info, installer_path, manual)
+                except Exception as exc:
+                    self.update_install_failed.emit(str(exc), manual)
+                finally:
+                    loop.close()
+
+            threading.Thread(target=_run_download, daemon=True).start()
+        except Exception as exc:
+            self._update_install_in_flight = False
+            logger.error("Failed to start update download: %s", exc)
+            if manual:
+                QMessageBox.warning(self.settings_window or self.dropzone, "Clyro", f"Update download failed.\n\n{exc}")
+
+    def _handle_update_download_ready(self, update_info, installer_path: str, manual: bool):
+        self._update_install_in_flight = False
+        self._pending_update_info = update_info
+        self._pending_update_installer = installer_path
+        self._install_update_on_quit = False
+        self._set_update_status_text(f"Version {update_info['version']} is ready to install.", "success")
+        self._set_update_action("Install Now", enabled=True, visible=True)
+        if self.tray.isVisible():
+            self.tray.showMessage("Clyro update", f"Version {update_info['version']} is ready to install.", msecs=6000)
+        self._prompt_update_ready(update_info)
+
+    def _prompt_update_ready(self, update_info: dict):
+        from clyro.ui.update_dialog import UpdateReadyDialog
+
+        if not self._pending_update_installer:
+            return
+
+        parent = self.settings_window if self.settings_window and self.settings_window.isVisible() else self.dropzone
+        dialog = UpdateReadyDialog(update_info["version"], parent=parent)
+        dialog.exec()
+
+        if dialog.choice == "now":
+            self._install_pending_update(now=True)
+            return
+
+        self._install_update_on_quit = True
+        self._set_update_status_text(
+            f"Version {update_info['version']} will install when Clyro closes.",
+            "muted",
+        )
+
+    def _handle_update_install_error(self, message: str, manual: bool):
+        self._update_install_in_flight = False
+        logger.error("Update transfer failed: %s", message)
+        self._set_update_status_text("Update failed.", "error")
+        if self._last_update_info:
+            self._set_update_action("Update Now", enabled=True, visible=True)
+        if self.tray.isVisible():
+            self.tray.showMessage("Clyro update", "Automatic update failed.", msecs=5000)
+        if manual:
+            QMessageBox.warning(self.settings_window or self.dropzone, "Clyro", f"Update install failed.\n\n{message}")
+
+    def _install_pending_update(self, *, now: bool):
+        if not self._pending_update_installer:
+            return
+
+        try:
+            from clyro.updater import AutoUpdater
+
+            installer_path = self._pending_update_installer
+            version = self._pending_update_info["version"] if self._pending_update_info else "update"
+            self._pending_update_installer = None
+            self._pending_update_info = None
+            self._install_update_on_quit = False
+            self._set_update_action(visible=False)
+            self._set_update_status_text(f"Installing version {version}...", "warning")
+            AutoUpdater.launch_installer(installer_path)
+            if self.tray.isVisible():
+                self.tray.showMessage("Clyro update", f"Installing version {version}.", msecs=5000)
+            if now:
+                self.quit()
+        except Exception as exc:
+            logger.error("Failed to launch installer: %s", exc)
+            self._set_update_status_text("Failed to launch installer.", "error")
+            if self._last_update_info:
+                self._set_update_action("Install Now", enabled=True, visible=True)
+            QMessageBox.warning(self.settings_window or self.dropzone, "Clyro", f"Failed to launch installer.\n\n{exc}")
+
+    def _show_update_dialog(self, update_info: dict, *, manual: bool = False):
+        from clyro.ui.update_dialog import UpdateDialog
+
+        parent = self.settings_window if self.settings_window and self.settings_window.isVisible() else self.dropzone
+        dialog = UpdateDialog(__version__, update_info, parent=parent)
+        dialog.exec()
+
+        if dialog.choice == "skip":
+            self.settings.skipped_update_version = update_info["version"]
+            self.store.save(self.settings)
+            self._set_update_status_text(f"Version {update_info['version']} will be skipped.", "muted")
+            self._set_update_action(visible=False)
+            return
+
+        if dialog.choice == "install":
+            self.settings.skipped_update_version = None
+            self.store.save(self.settings)
+            if update_info.get("download_url"):
+                self._start_update_download(update_info, True)
+                return
+
+            target = update_info.get("release_url")
+            if target:
+                webbrowser.open(target)
+                self._set_update_status_text(f"Opened release page for {update_info['version']}.", "success")
+            elif self.tray.isVisible():
+                self.tray.showMessage("Clyro update available", "Release page could not be opened.", msecs=5000)
 
     def quit(self):
+        if self._install_update_on_quit and self._pending_update_installer:
+            self._install_pending_update(now=False)
         self.dropzone.quit()    # cancel in-flight downloads first
         if self.ipc:
             self.ipc.stop()
