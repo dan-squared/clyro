@@ -5,12 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.5] - 2026-03-07
+## [0.1.6] - 2026-03-07
 
 ### Fixed
 - Fixed a `NameError` in `image.py` where `PIL.Image` was used in type hints before being imported.
 - Restored corrupted sections of `image.py` from a botched edit.
 - Pushed missing local changes that were excluded from the previous release.
+- Refreshed pinned SHA-256 checksums in `build_release.py` for FFmpeg, pngquant, and gifsicle after upstream archives changed at the same URLs.
 
 ## [0.1.4] - 2026-03-07
 

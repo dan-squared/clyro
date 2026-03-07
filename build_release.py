@@ -31,19 +31,19 @@ TOOL_DOWNLOADS = {
     "ffmpeg": {
         "label": "FFmpeg (~101 MB, may take a few minutes)",
         "url": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.0.1-essentials_build.zip",
-        "sha256": "e2aa8588ce58ce1d1a6007b27f7f4e642d71b3611586adca811c0e4402d56f6b",
+        "sha256": "e2aaeaa0fdbc397d4794828086424d4aaa2102cef1fb6874f6ffd29c0b88b673",
         "archive_name": "ffmpeg.zip",
     },
     "pngquant": {
         "label": "pngquant",
         "url": "https://pngquant.org/pngquant-windows.zip",
-        "sha256": "bd025759f8c58041fd118341d831d9a90ddc8095f61e3bd116ca6438d8f35352",
+        "sha256": "bd0257aeeccfe446a4cd764927e26f8af6051796f28abed104307284107b120d",
         "archive_name": "pngquant.zip",
     },
     "gifsicle": {
         "label": "gifsicle",
         "url": "https://eternallybored.org/misc/gifsicle/releases/gifsicle-1.95-win64.zip",
-        "sha256": "7e47dd75334d757d07565d2f1ff7d5d7f2430cfb521bc7dc29b838bbff39f134",
+        "sha256": "7e47dd0bfd5ee47f911464c57faeed89a8709a7625dd1c449b16579889539ee8",
         "archive_name": "gifsicle.zip",
     },
     "jpegoptim": {
