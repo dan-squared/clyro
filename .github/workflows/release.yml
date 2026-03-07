@@ -36,6 +36,13 @@ jobs:
         # If the user has a script to pull ffmpeg/gs, it would run here.
         # Otherwise, the app acts normally but misses deps unless bundled.
         
+    - name: Get Version
+      id: vars
+      shell: bash
+      run: |
+        VERSION=$(grep '__version__' src/clyro/__init__.py | cut -d '"' -f 2)
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
     - name: Build Executable via PyInstaller
       run: |
         python build_release.py --skip-inno
@@ -44,6 +51,7 @@ jobs:
       uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
       with:
         path: installer.iss
+        options: /DMyAppVersion=${{ steps.vars.outputs.version }}
         
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
