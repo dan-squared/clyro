@@ -132,7 +132,7 @@ class UpdateReadyDialog(QDialog):
         self.choice = "later"
 
         self.setWindowTitle("Update Ready")
-        self.setMinimumSize(460, 220)
+        self.setFixedSize(400, 176)
         self.setModal(True)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
         self.setStyleSheet(
@@ -154,18 +154,20 @@ class UpdateReadyDialog(QDialog):
         )
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 22, 24, 22)
-        layout.setSpacing(12)
+        layout.setContentsMargins(22, 20, 22, 20)
+        layout.setSpacing(10)
 
-        title = QLabel(f"Version {version} is ready to install")
-        title.setStyleSheet(f"font-size: 22px; font-weight: 700; color: {theme.TEXT_PRIMARY};")
+        title = QLabel("Update ready")
+        title.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {theme.TEXT_PRIMARY};")
         layout.addWidget(title)
 
         body = QLabel(
-            "Install now to restart into the new version, or choose Later and Clyro will install it when you close the app."
+            f"Version {version} has been downloaded. Install it now, or choose Later to install when Clyro closes."
         )
         body.setWordWrap(True)
-        body.setStyleSheet(f"font-size: 13px; color: {theme.TEXT_SECONDARY};")
+        body.setStyleSheet(
+            f"font-size: 12px; color: {theme.TEXT_SECONDARY}; font-family: {theme.VALUE_FONT_STACK};"
+        )
         layout.addWidget(body)
 
         actions = QHBoxLayout()
@@ -180,9 +182,9 @@ class UpdateReadyDialog(QDialog):
         now_btn.setStyleSheet(theme.PRIMARY_BUTTON_STYLE)
         now_btn.clicked.connect(self._now)
 
-        actions.addStretch()
-        actions.addWidget(later_btn)
         actions.addWidget(now_btn)
+        actions.addWidget(later_btn)
+        actions.addStretch()
         layout.addLayout(actions)
 
     def _later(self):

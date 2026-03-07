@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from PyQt6.QtGui import QFontDatabase
 
-from clyro.utils.paths import resource_path
-
 WINDOW_BG = "#f4f5f7"
 WINDOW_PANEL = "#ffffff"
 SIDEBAR_BG = "#ffffff"
@@ -21,12 +19,7 @@ SUCCESS = "#138a5c"
 WARNING = "#a26b14"
 ERROR = "#d64e4e"
 
-_FONT_FILES = (
-    "clyro/assets/fonts/InstrumentSerif-Regular.ttf",
-    "clyro/assets/fonts/InstrumentSerif-Italic.ttf",
-    "clyro/assets/fonts/NunitoSans-Variable.ttf",
-    "clyro/assets/fonts/JetBrainsMono[wght].ttf",
-)
+_FONT_FILES = ()
 _fonts_loaded = False
 
 
@@ -43,7 +36,7 @@ def ensure_fonts_loaded():
     _fonts_loaded = True
 
 
-FONT_STACK = '"Instrument Serif", "Georgia", "Times New Roman", serif'
+FONT_STACK = '-apple-system, "Segoe UI", BlinkMacSystemFont, sans-serif'
 VALUE_FONT_STACK = FONT_STACK
 NUMERIC_FONT_STACK = '"JetBrains Mono", "Consolas", monospace'
 

@@ -1,6 +1,6 @@
 [Setup]
 AppName=Clyro
-AppVersion=0.1.4
+AppVersion=0.1.5
 AppPublisher=Daniel
 DefaultDirName={autopf}\Clyro
 DefaultGroupName=Clyro
