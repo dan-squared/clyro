@@ -6,23 +6,43 @@ project_root = os.path.abspath(os.path.dirname(os.getcwd()))
 # build_release.py runs PyInstaller from PROJECT_ROOT.
 project_root = os.getcwd()
 
+
+def _required_entries(entries, kind):
+    collected = []
+    missing = []
+    for relative_path, destination in entries:
+        source_path = os.path.join(project_root, relative_path)
+        if os.path.exists(source_path):
+            collected.append((source_path, destination))
+        else:
+            missing.append(relative_path)
+    if missing:
+        missing_list = ", ".join(missing)
+        raise SystemExit(f"[Clyro.spec] Missing required {kind}(s): {missing_list}")
+    return collected
+
+
+binary_entries = [
+    ('bin/ffmpeg.exe', 'bin'),
+    ('bin/ffprobe.exe', 'bin'),
+    ('bin/gswin64c.exe', 'bin'),
+    ('bin/gsdll64.dll', 'bin'),
+    ('bin/pngquant.exe', 'bin'),
+    ('bin/gifsicle.exe', 'bin'),
+    ('bin/jpegoptim.exe', 'bin'),
+]
+
+data_entries = [
+    ('src/clyro/assets', 'clyro/assets'),
+    ('bin/gs_lib', 'bin/gs_lib'),
+    ('bin/gs_resource', 'bin/gs_resource'),
+]
+
 a = Analysis(
     ['src/clyro/main.py'],
     pathex=[],
-    binaries=[
-        (os.path.join(project_root, 'bin', 'ffmpeg.exe'),   'bin'),
-        (os.path.join(project_root, 'bin', 'ffprobe.exe'),  'bin'),
-        (os.path.join(project_root, 'bin', 'gswin64c.exe'), 'bin'),
-        (os.path.join(project_root, 'bin', 'gsdll64.dll'),  'bin'),
-        (os.path.join(project_root, 'bin', 'pngquant.exe'), 'bin'),
-        (os.path.join(project_root, 'bin', 'gifsicle.exe'), 'bin'),
-        (os.path.join(project_root, 'bin', 'jpegoptim.exe'), 'bin'),
-    ],
-    datas=[
-        (os.path.join(project_root, 'src', 'clyro', 'assets'), 'clyro/assets'),
-        (os.path.join(project_root, 'bin', 'gs_lib'), 'bin/gs_lib'),
-        (os.path.join(project_root, 'bin', 'gs_resource'), 'bin/gs_resource'),
-    ],
+    binaries=_required_entries(binary_entries, "binary"),
+    datas=_required_entries(data_entries, "data"),
     hiddenimports=['mozjpeg_lossless_optimization', 'cffi', 'pycparser', 'pdf2docx', 'pdf2docx.converter', 'docx', 'fitz'],
     hookspath=[],
     hooksconfig={},

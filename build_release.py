@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -26,6 +27,9 @@ DIST_DIR = PROJECT_ROOT / "dist"
 SPEC_FILE = PROJECT_ROOT / "Clyro.spec"
 ISS_FILE = PROJECT_ROOT / "installer.iss"
 VERSION_FILE = PROJECT_ROOT / "src" / "clyro" / "__init__.py"
+PYINSTALLER_CACHE_DIR = PROJECT_ROOT / ".pyinstaller_local"
+PNGQUANT_GIT_URL = "https://github.com/kornelski/pngquant.git"
+PNGQUANT_GIT_BRANCH = "msvc"
 
 TOOL_DOWNLOADS = {
     "ffmpeg": {
@@ -128,6 +132,17 @@ def _download_archive(tool_name: str) -> Path | None:
     return archive_path
 
 
+def _run_command(cmd: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        cmd,
+        cwd=str(cwd) if cwd else None,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 def download_ffmpeg() -> bool:
     if (BIN_DIR / "ffmpeg.exe").exists() and (BIN_DIR / "ffprobe.exe").exists():
         print("  [OK] ffmpeg + ffprobe already present")
@@ -177,26 +192,83 @@ def download_pngquant() -> bool:
         return True
 
     archive_path = _download_archive("pngquant")
-    if archive_path is None:
+    if archive_path is not None:
+        tmp = PROJECT_ROOT / "tmp_downloads"
+        print("  ... Extracting pngquant...")
+        try:
+            extract_zip(archive_path, tmp)
+        except Exception as exc:
+            print(f"    [FAIL] Extraction failed: {exc}")
+        else:
+            BIN_DIR.mkdir(exist_ok=True)
+            for exe in tmp.rglob("pngquant.exe"):
+                shutil.copy2(exe, BIN_DIR / "pngquant.exe")
+                print("    [OK] pngquant.exe -> bin/")
+                _cleanup_tmp()
+                return True
+            print("    [FAIL] pngquant.exe not found in archive")
+
+    print("  ... Falling back to Cargo build for pngquant (official Windows path)...")
+    return build_pngquant()
+
+
+def build_pngquant() -> bool:
+    cargo = shutil.which("cargo")
+    git = shutil.which("git")
+    if not cargo:
+        print("    [FAIL] Cargo is not installed or not on PATH.")
+        return False
+    if not git:
+        print("    [FAIL] Git is not installed or not on PATH.")
         return False
 
-    tmp = PROJECT_ROOT / "tmp_downloads"
-    print("  ... Extracting pngquant...")
+    build_root = Path(tempfile.mkdtemp(prefix="clyro_pngquant_", dir=str(PROJECT_ROOT)))
+    repo_dir = build_root / "pngquant"
+    target_dir = build_root / "target"
+    env = os.environ.copy()
+    env["CARGO_TARGET_DIR"] = str(target_dir)
+
     try:
-        extract_zip(archive_path, tmp)
-    except Exception as exc:
-        print(f"    [FAIL] Extraction failed: {exc}")
-        return False
+        clone_cmd = [
+            git,
+            "clone",
+            "--depth",
+            "1",
+            "--branch",
+            PNGQUANT_GIT_BRANCH,
+            PNGQUANT_GIT_URL,
+            str(repo_dir),
+        ]
+        clone_result = _run_command(clone_cmd, cwd=PROJECT_ROOT, env=env)
+        if clone_result.returncode != 0:
+            print("    [FAIL] Git clone failed for pngquant.")
+            if clone_result.stdout.strip():
+                print(clone_result.stdout.strip())
+            if clone_result.stderr.strip():
+                print(clone_result.stderr.strip())
+            return False
 
-    BIN_DIR.mkdir(exist_ok=True)
-    for exe in tmp.rglob("pngquant.exe"):
-        shutil.copy2(exe, BIN_DIR / "pngquant.exe")
-        print("    [OK] pngquant.exe -> bin/")
-        _cleanup_tmp()
+        build_cmd = [cargo, "build", "--release", "--locked"]
+        build_result = _run_command(build_cmd, cwd=repo_dir, env=env)
+        if build_result.returncode != 0:
+            print("    [FAIL] Cargo build failed for pngquant.")
+            if build_result.stdout.strip():
+                print(build_result.stdout.strip())
+            if build_result.stderr.strip():
+                print(build_result.stderr.strip())
+            return False
+
+        built_exe = target_dir / "release" / "pngquant.exe"
+        if not built_exe.exists():
+            print(f"    [FAIL] Expected built pngquant binary not found: {built_exe}")
+            return False
+
+        BIN_DIR.mkdir(exist_ok=True)
+        shutil.copy2(built_exe, BIN_DIR / "pngquant.exe")
+        print("    [OK] pngquant.exe built with Cargo -> bin/")
         return True
-
-    print("    [FAIL] pngquant.exe not found in archive")
-    return False
+    finally:
+        shutil.rmtree(build_root, ignore_errors=True)
 
 
 def download_gifsicle() -> bool:
@@ -337,32 +409,38 @@ def download_all_binaries() -> bool:
         if not ok:
             all_ok = False
 
-    print("\n-- File Check --")
-    required_files = [
+    print("\n-- Bundle Inputs --")
+    expected_files = [
         "ffmpeg.exe", "ffprobe.exe",
         "pngquant.exe", "gifsicle.exe", "jpegoptim.exe",
         "gswin64c.exe", "gsdll64.dll",
     ]
-    required_dirs = ["gs_lib", "gs_resource"]
+    expected_dirs = ["gs_lib", "gs_resource"]
 
-    for name in required_files:
+    for name in expected_files:
         path = BIN_DIR / name
-        status = "[OK]" if path.exists() else "[FAIL]"
+        status = "[OK]" if path.exists() else "[MISSING]"
         print(f"  {status}  {name}")
 
-    for name in required_dirs:
+    for name in expected_dirs:
         path = BIN_DIR / name
-        status = "[OK]" if path.exists() else "[FAIL]"
+        status = "[OK]" if path.exists() else "[MISSING]"
         print(f"  {status}  {name}/")
 
     if not all_ok:
         print("\n  [WARN]  Some binaries are missing!")
         print("     The build will NOT proceed until all binaries are present.")
-        print("     Please download the missing ones manually and place them in:")
+        print("     Please download or build the missing ones and place them in:")
         print(f"     {BIN_DIR}")
 
     _cleanup_tmp()
     return all_ok
+
+
+def _pyinstaller_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env.setdefault("PYINSTALLER_CONFIG_DIR", str(PYINSTALLER_CACHE_DIR))
+    return env
 
 
 def run_pyinstaller(version: str) -> bool:
@@ -375,9 +453,11 @@ def run_pyinstaller(version: str) -> bool:
         return False
 
     cmd = [sys.executable, "-m", "PyInstaller", "--clean", "--noconfirm", str(SPEC_FILE)]
+    env = _pyinstaller_env()
     print(f"  Running: {' '.join(cmd)}\n")
+    print(f"  PyInstaller cache: {env['PYINSTALLER_CONFIG_DIR']}\n")
 
-    result = subprocess.run(cmd, cwd=str(PROJECT_ROOT))
+    result = subprocess.run(cmd, cwd=str(PROJECT_ROOT), env=env)
     if result.returncode != 0:
         print("\n  [FAIL] PyInstaller build failed!")
         return False
@@ -462,7 +542,7 @@ def main():
         all_present = download_all_binaries()
         if not all_present and not download_only:
             print("\n  [FAIL] Cannot proceed with build — missing binaries.")
-            print("    Fix the missing downloads above, then re-run.")
+            print("    Fix the missing downloads/builds above, then re-run.")
             sys.exit(1)
     else:
         print("\n  ... Skipping binary downloads (--skip-download)")

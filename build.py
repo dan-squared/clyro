@@ -3,6 +3,29 @@ from pathlib import Path
 import os
 import sys
 
+REQUIRED_BINARIES = [
+    "ffmpeg.exe",
+    "ffprobe.exe",
+    "gswin64c.exe",
+    "gsdll64.dll",
+    "pngquant.exe",
+    "gifsicle.exe",
+    "jpegoptim.exe",
+]
+
+REQUIRED_DIRS = [
+    "gs_lib",
+    "gs_resource",
+]
+
+
+def _missing_build_inputs(project_root: Path) -> list[str]:
+    bin_dir = project_root / "bin"
+    missing = [name for name in REQUIRED_BINARIES if not (bin_dir / name).exists()]
+    missing.extend(f"{name}/" for name in REQUIRED_DIRS if not (bin_dir / name).exists())
+    return missing
+
+
 def build():
     # Ensure we are running from project root
     project_root = Path(__file__).resolve().parent
@@ -10,6 +33,14 @@ def build():
         project_root = project_root.parent.parent
         
     os.chdir(project_root)
+    os.environ.setdefault("PYINSTALLER_CONFIG_DIR", str(project_root / ".pyinstaller_local"))
+
+    missing = _missing_build_inputs(project_root)
+    if missing:
+        missing_text = ", ".join(missing)
+        raise RuntimeError(
+            f"Missing required build inputs in {project_root / 'bin'}: {missing_text}"
+        )
     
     # 1. Base command, pointing to the CLI entry or main app entry
     cmd = [
@@ -32,8 +63,7 @@ def build():
         
     # 3. Add heavy binaries
     bin_dir = project_root / "bin"
-    if bin_dir.exists():
-        cmd.append(f"--add-binary={bin_dir};bin")
+    cmd.append(f"--add-binary={bin_dir};bin")
         
     # 4. Icon
     icon_path = assets_dir / "icons" / "app" / "256.ico"
